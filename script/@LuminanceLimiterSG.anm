@@ -1,10 +1,10 @@
-@輝度リミッターSGオプション
+@基本パラメータ
 --track0:上限, 0.0, 4096.0, 4096.0, 0.01
 --track1:上限閾値, 0.0, 4096.0, 0.0, 0.01
---track4:下限閾値, 0.0, 4096.0, 4096.0, 0.01
+--track2:下限閾値, 0.0, 4096.0, 4096.0, 0.01
 --track3:下限, 0.0, 4096.0, 0.0, 0.01
 
-local Global = getenv(0)
+local Global = getfenv(0)
 if(Global.LuminanceLimiterState == nil) then
     Global.LuminanceLimiterState = {}
 end
@@ -18,38 +18,71 @@ llst.bottom_limit_opt = _0[3] or obj.track2
 llst.bottom_threashold_opt = _0[4] or obj.track3
 _0 = nil
 
+@詳細オプション
+--track0:輝度モード, 0, 0, 0, 0
+--track1:補間モード, 0, 0, 0, 0
+
+local Global = getfenv(0)
+if(Global.LuminanceLimiterState == nil) then
+    Global.LuminanceLimiterState = {}
+end
+
+local llst = Global.LuminanceLimiterState
+
+_0 = _0 or {}
+llst.luminous_mode_opt = _0[1] or obj.track0
+llst.interpolation_mode_opt = _0[2] or obj.track1
+_0 = nil
+
 
 @輝度リミッターSG
 --track0: ゲイン, -4096.0, 4096.0, 0.0, 0.01
---track1: 補間モード, 0, 0, 0, 0
+
+local ll = require("luminance_limiter_sg")
 
 _0 = _0 or {}
-local gain = _0[1] or obj.track0
+local gain = (_0[1] or obj.track0) / ll.lmax
 _0 = nil
 
-local Global = getenv(0)
+local Global = getfenv(0)
 if(Global.LuminanceLimiterState == nil) then
     Global.LuminanceLimiterState = {}
 end
 local llst = Global.LuminanceLimiterState
 
-local ll = require("luminance_limiter_sg")
 
 local top_limit = (llst.top_limit_opt or ll.lmax) / ll.lmax
 local top_threashold = (llst.top_threashold_opt or ll.lmin) / ll.lmax
 local bottom_limit = (llst.bottom_limit_opt or ll.lmin) / ll.lmax
 local bottom_threashold = (llst.bottom_threashold_opt or ll.lmax) / ll.lmax
 
-local data, w, h = obj.getpixeldata()
+local luminous_mode = llst.luminous_mode_opt or 0
+local interpolation_mode = llst.interpolation_mode_opt or 0
 
-local character = ll.Character.new(
-    interpolation_mode,
-    top_limit, top_threashold,
-    bottom_limit, bottom_threashold,
-    top_peak, bottom_peak)
+local luminous_image = ll.LuminousImage.new(obj, luminous_mode)
+if luminous_image == nil then
+    print("ERROR: cannot create luminous image.")
+    return -1
+end
 
-    local limiter = Limiter.new()
+local top_peak =
+    luminous_image:fold(
+        luminous_image.luminance_bi_op(math.max), -math.huge) +
+        ((gain > 0) and gain or 0)
+local bottom_peak =
+    luminous_image:fold(
+        luminous_image.luminance_bi_op(math.min), math.huge) +
+        ((gain < 0) and gain or 0)
 
-local limited = limiter:limit(gain, character, data, w, h)
+local character =
+    ll.Character.new(
+        interpolation_mode,
+        top_limit, top_threashold,
+        bottom_limit, bottom_threashold,
+        top_peak, bottom_peak)
 
-obj.setpixeldata(limited)
+local limiter = ll.Limiter.new(top_peak, bottom_peak, character, gain)
+
+local limited =
+    luminous_image:replace(luminous_image.map, limiter.limiter)
+
