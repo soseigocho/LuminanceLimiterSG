@@ -24,15 +24,16 @@ end
 ll_mod.LuminousImage = {}
 ll_mod.LuminousImage.new = function(obj, luminous_mode)
     if luminous_mode == 0 then
-        obj.pixeloption("yc")
+        obj.pixeloption("type", "yc")
+        obj.pixeloption("get", "obj")
+        obj.pixeloption("put", "obj")
         return {
             img = obj,
             map = function (self, f)
-                    local width = self.img.w
-                    local height = self.img.h
-                    for i = 0, width - 1 do
-                        for j = 0, height - 1 do
-                            local Y, cb, cr, a = self.img.getpixel(i,j,"yc")
+                    local width, height = self.img.getpixel()
+                    for j = 0, height - 1 do
+                        for i = 0, width - 1 do
+                            local Y, cb, cr, a = self.img.getpixel(i, j, "yc")
                             local pixel = ll_mod.Pixel_YC.new(Y, cb, cr, a)
                             coroutine.yield(f(pixel))
                         end
@@ -54,7 +55,7 @@ ll_mod.LuminousImage.new = function(obj, luminous_mode)
             end,
             replace = function(self, cf, f)
                 local c = coroutine.create(cf)
-                local width = self.img.w
+                local width, height = self.img.getpixel()
                 local k = 0
                 repeat
                     local i = k % width
@@ -127,7 +128,6 @@ ll_mod.Limiter.new = function(top_peak, bottom_peak, character, gain)
             limiter = function(luminous_pixel)
                 luminous_pixel.Y =
                     character(luminous_pixel:luminance()) * ll_mod.lmax
-                    print(luminous_pixel.Y)
                     return luminous_pixel
             end
         }
@@ -137,7 +137,6 @@ ll_mod.Limiter.new = function(top_peak, bottom_peak, character, gain)
             limiter = function(luminous_pixel)
                 local gained = luminous_pixel:luminance() * pr
                 luminous_pixel.Y = character(gained) * ll_mod.lmax
-                print(luminous_pixel.Y)
                 return luminous_pixel
             end
         }
@@ -148,7 +147,6 @@ ll_mod.Limiter.new = function(top_peak, bottom_peak, character, gain)
                 local gained =
                     (luminous_pixel:luminance() - top_peak) * pr + top_peak
                 luminous_pixel.Y = character(gained) * ll_mod.lmax
-                print(luminous_pixel.Y)
                 return luminous_pixel
             end
         }

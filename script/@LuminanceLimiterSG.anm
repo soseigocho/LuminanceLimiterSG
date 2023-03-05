@@ -86,3 +86,4 @@ local limiter = ll.Limiter.new(top_peak, bottom_peak, character, gain)
 local limited =
     luminous_image:replace(luminous_image.map, limiter.limiter)
 
+return limited
