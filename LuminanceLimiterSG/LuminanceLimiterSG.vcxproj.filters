@@ -21,4 +21,9 @@
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="src\luminance_limiter_sg.def">
+      <Filter>src</Filter>
+    </None>
+  </ItemGroup>
 </Project>
