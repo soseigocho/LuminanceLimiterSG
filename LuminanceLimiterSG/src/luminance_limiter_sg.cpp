@@ -2,7 +2,7 @@
 
 #include <aviutl/filter.hpp>
 
-constexpr AviUtl::FilterPluginDLL filter{
+AviUtl::FilterPluginDLL filter{
   .flag = AviUtl::FilterPlugin::Flag::AlwaysActive,
   .name = "LuminanceLimiterSG",
 };
