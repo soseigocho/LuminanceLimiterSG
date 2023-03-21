@@ -29,5 +29,8 @@ LICENSEの通り、本ソフトウェアは、MPL 2.0に基づいて「現状の
 
 <a id="markdown-License"></a>
 
+## Credit : クレジット
+- [aviutl_exedit_sdk](https://github.com/ePi5131/aviutl_exedit_sdk)
+
 ## License : ライセンス
 ***LuminanceLimiterSG*** は[MPL 2.0](https://www.mozilla.org/en-US/MPL/2.0/)の下で公開されます。詳細は[LICENSEファイル](./LICENSE)を参照してください。
