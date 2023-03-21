@@ -2,6 +2,7 @@
 
 #include <array>
 #include <limits>
+#include <optional>
 
 
 namespace luminance_limiter_sg {
@@ -18,12 +19,12 @@ namespace luminance_limiter_sg {
 	constexpr static inline auto y_min = 0.0f;
 
 	template <typename T>
-	NormalizedY normalize_y(T y) noexcept {
+	NormalizedY normalize_y(const T y) noexcept {
 		return static_cast<float>(y) / y_max;
 	}
 
 	template <typename T>
-	T denormalize_y(NormalizedY normalized_y) noexcept {
+	T denormalize_y(const NormalizedY normalized_y) noexcept {
 		return static_cast<T>(normalized_y * y_max);
 	}
 
@@ -79,7 +80,7 @@ namespace luminance_limiter_sg {
 		return true;
 	}
 
-	constexpr static inline auto stretch_scale(NormalizedY peak, NormalizedY threashold, NormalizedY diff) noexcept
+	constexpr static inline auto stretch_scale(const NormalizedY peak, const NormalizedY threashold, const NormalizedY diff) noexcept
 	{
 		const auto range = peak - threashold;
 		const auto scaled_range = peak + diff - threashold;
@@ -87,7 +88,7 @@ namespace luminance_limiter_sg {
 		return scale;
 	}
 
-	constexpr static inline auto stretch_diff(NormalizedY threashold, NormalizedY scale, NormalizedY y) noexcept
+	constexpr static inline auto stretch_diff(const NormalizedY threashold, const NormalizedY scale, const NormalizedY y) noexcept
 	{
 		const auto stretching_range = y - threashold;
 		const auto stretched_range = stretching_range * scale;
@@ -98,7 +99,7 @@ namespace luminance_limiter_sg {
 
 	constexpr static inline auto make_scale(
 		const NormalizedY orig_top, const NormalizedY orig_bottom,
-		const NormalizedY top_diff, const NormalizedY bottom_diff)
+		const NormalizedY top_diff, const NormalizedY bottom_diff) noexcept
 	{
 		const auto top_scale = stretch_scale(orig_top, orig_bottom, top_diff);
 		const auto bottom_scale = stretch_scale(orig_bottom, orig_top, bottom_diff);
@@ -110,19 +111,71 @@ namespace luminance_limiter_sg {
 		};
 	}
 
-	constexpr static inline auto make_gain(NormalizedY gain)
+	constexpr static inline auto make_gain(const NormalizedY gain) noexcept
 	{
 		return [=](NormalizedY y) {return y + gain; };
 	}
 
-	constexpr static inline auto make_character()
+	constexpr static inline auto make_character(
+		const NormalizedY top_limit, const NormalizedY top_threashold,
+		const NormalizedY bottom_limit, const NormalizedY bottom_threashold,
+		const NormalizedY top_peak, const NormalizedY bottom_peak)
 	{
-		return 0;
+		auto top_coefficient = 1.0f;
+		auto top_slice = 0.0f;
+		if (top_peak >= top_limit)
+		{
+			top_coefficient =
+				(top_limit - top_threashold) / (top_peak - top_threashold);
+			top_slice = top_limit - top_peak * top_coefficient;
+		}
+
+		auto bottom_coefficient = 1.0f;
+		auto bottom_slice = 0.0f;
+		if (bottom_peak <= bottom_limit)
+		{
+			bottom_coefficient =
+				(bottom_limit - bottom_threashold) / (bottom_peak - bottom_threashold);
+			bottom_slice = bottom_limit - bottom_peak * bottom_coefficient;
+		}
+
+		return [=](const NormalizedY y) -> NormalizedY {
+			if (y >= top_threashold)
+			{
+				return top_coefficient * y + top_slice;
+			}
+			else if (y < top_threashold && y > bottom_threashold)
+			{
+				return y;
+			}
+			else
+			{
+				return bottom_coefficient * y + bottom_slice;
+			}
+		};
 	}
 
-	constexpr static inline auto make_limit()
+	template <typename F>
+	constexpr static inline auto make_limit(
+		const F& character,
+		const NormalizedY top_limit,
+		const NormalizedY bottom_limit)
 	{
-		return 0;
+		return [=,&character](const NormalizedY y) -> NormalizedY {
+			const auto charactered = character(y);
+			if (charactered > top_limit)
+			{
+				return top_limit;
+			}
+			else if (charactered < bottom_limit)
+			{
+				return bottom_limit;
+			}
+			else
+			{
+				return charactered;
+			}
+		};
 	}
 
 	static inline BOOL func_proc(AviUtl::FilterPlugin* fp, AviUtl::FilterProcInfo* fpip)
@@ -139,10 +192,22 @@ namespace luminance_limiter_sg {
 		const auto gain = make_gain(gain_val);
 
 		const auto scale_and_gain = [&](NormalizedY y) {return gain(scale(y)); };
-		normalized_y_buffer.pixelwise_map(scale_and_gain);
 
-		const auto gained_top = normalized_y_buffer.maximum();
-		const auto gained_bottom = normalized_y_buffer.minimum();
+		const auto top_limit = normalize_y(fp->track[0]);
+		const auto top_threashold = top_limit + normalize_y(fp->track[1]);
+		const auto bottom_limit = normalize_y(fp->track[2]);
+		const auto bottom_threashold = bottom_limit + normalize_y(fp->track[3]);
+		const auto gained_top = scale_and_gain(orig_top);
+		const auto gained_bottom = scale_and_gain(orig_bottom);
+
+		const auto character =
+			make_character(top_limit, top_threashold,
+				bottom_limit, bottom_threashold,
+				gained_top, gained_bottom);
+
+		const auto limit = make_limit(character, top_limit, bottom_limit);
+
+		normalized_y_buffer.pixelwise_map([&](NormalizedY y) -> NormalizedY {return limit(scale_and_gain(y)); });
 
 		normalized_y_buffer.render(fpip);
 

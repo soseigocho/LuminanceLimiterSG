@@ -17,7 +17,7 @@ namespace luminance_limiter_sg {
 		NormalizedY minimum() const noexcept;
 
 		template<typename F>
-		BOOL pixelwise_map(F f) {
+		BOOL pixelwise_map(const F&& f) {
 			for (auto& elem : this->buffer)
 			{
 				elem = f(elem);
