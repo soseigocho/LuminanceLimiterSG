@@ -72,20 +72,17 @@ namespace luminance_limiter_sg {
 			row = static_cast<AviUtl::PixelYC*>(fpip->ycp_edit) + y * max_width;
 			for (auto x = 0; x < width; ++x)
 			{
-				(row+x)->y = denormalize_y<int16_t>(this->buffer[buf_idx]);
+				(row + x)->y = denormalize_y<int16_t>(this->buffer[buf_idx]);
 				buf_idx++;
 			}
 		}
 		return true;
 	}
 
-	constexpr static inline auto stretch_scale(NormalizedY peak, NormalizedY diff, NormalizedY range) noexcept
+	constexpr static inline auto stretch_scale(NormalizedY peak, NormalizedY threashold, NormalizedY diff) noexcept
 	{
-		const auto scaled = peak + diff;
-		const auto scaled_range = scaled - peak;
-		if (scaled_range <= std::numeric_limits<NormalizedY>::epsilon()) {
-			return 1.0f;
-		}
+		const auto range = peak - threashold;
+		const auto scaled_range = range + diff;
 		const auto scale = scaled_range / range;
 		return scale;
 	}
@@ -103,10 +100,8 @@ namespace luminance_limiter_sg {
 		const NormalizedY orig_top, const NormalizedY orig_bottom,
 		const NormalizedY top_diff, const NormalizedY bottom_diff)
 	{
-		const auto range = orig_top - orig_bottom;
-
-		const auto top_scale = stretch_scale(orig_top, top_diff, range);
-		const auto bottom_scale = stretch_scale(orig_bottom, bottom_diff, -range);
+		const auto top_scale = stretch_scale(orig_top, orig_bottom, top_diff);
+		const auto bottom_scale = stretch_scale(orig_bottom, orig_top, bottom_diff);
 
 		return [=](NormalizedY y) -> NormalizedY {
 			const auto upper_y_diff = stretch_diff(orig_bottom, top_scale, y);
@@ -144,7 +139,7 @@ namespace luminance_limiter_sg {
 		const auto gain = make_gain(gain_val);
 
 		const auto scale_and_gain = [&](NormalizedY y) {return gain(scale(y)); };
-		normalized_y_buffer.pixelwise_map(gain);
+		normalized_y_buffer.pixelwise_map(scale_and_gain);
 
 		const auto gained_top = normalized_y_buffer.maximum();
 		const auto gained_bottom = normalized_y_buffer.minimum();
