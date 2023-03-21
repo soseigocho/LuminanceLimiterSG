@@ -56,7 +56,7 @@ namespace luminance_limiter_sg {
 
 	NormalizedY NormalizedYBuffer::minimum() const noexcept
 	{
-		return *std::max_element(this->buffer.begin(), this->buffer.end());
+		return *std::min_element(this->buffer.begin(), this->buffer.end());
 	}
 
 	BOOL NormalizedYBuffer::render(AviUtl::FilterProcInfo* fpip) const noexcept
@@ -82,7 +82,7 @@ namespace luminance_limiter_sg {
 	constexpr static inline auto stretch_scale(NormalizedY peak, NormalizedY threashold, NormalizedY diff) noexcept
 	{
 		const auto range = peak - threashold;
-		const auto scaled_range = range + diff;
+		const auto scaled_range = peak + diff - threashold;
 		const auto scale = scaled_range / range;
 		return scale;
 	}
