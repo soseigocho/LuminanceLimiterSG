@@ -25,7 +25,7 @@ namespace luminance_limiter_sg {
 			return true;
 		}
 
-		BOOL render(AviUtl::PixelYC* target) const noexcept;
+		BOOL render(AviUtl::FilterProcInfo* fpip) const noexcept;
 	private:
 		std::vector<NormalizedY> buffer;
 	};

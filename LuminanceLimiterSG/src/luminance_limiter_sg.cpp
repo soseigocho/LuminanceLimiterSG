@@ -42,7 +42,7 @@ namespace luminance_limiter_sg {
 			row = static_cast<AviUtl::PixelYC*>(fpip->ycp_edit) + y * max_width;
 			for (auto x = 0; x < width; ++x)
 			{
-				buffer[buf_idx] = normalize_y((row + x)->y);
+				this->buffer[buf_idx] = normalize_y((row + x)->y);
 				buf_idx++;
 			}
 		}
@@ -58,12 +58,22 @@ namespace luminance_limiter_sg {
 		return *std::max_element(this->buffer.begin(), this->buffer.end());
 	}
 
-	BOOL NormalizedYBuffer::render(AviUtl::PixelYC* target) const noexcept
+	BOOL NormalizedYBuffer::render(AviUtl::FilterProcInfo* fpip) const noexcept
 	{
-		for (const auto& elem : buffer)
+		const auto max_width = fpip->max_w;
+		const auto width = fpip->w;
+		const auto height = fpip->h;
+
+		AviUtl::PixelYC* row = nullptr;
+		auto buf_idx = 0;
+		for (auto y = 0; y < height; ++y)
 		{
-			const auto idx = &elem - &buffer[0];
-			target[idx].y = denormalize_y<int16_t>(elem);
+			row = static_cast<AviUtl::PixelYC*>(fpip->ycp_edit) + y * max_width;
+			for (auto x = 0; x < width; ++x)
+			{
+				(row+x)->y = denormalize_y<int16_t>(this->buffer[buf_idx]);
+				buf_idx++;
+			}
 		}
 		return true;
 	}
@@ -130,12 +140,12 @@ namespace luminance_limiter_sg {
 		const auto gain = make_gain(gain_val);
 
 		const auto scale_and_gain = [&](NormalizedY y) {return gain(scale(y)); };
-		normalized_y_buffer.pixelwise_map(scale_and_gain);
+		normalized_y_buffer.pixelwise_map(gain);
 
 		const auto gained_top = normalized_y_buffer.maximum();
 		const auto gained_bottom = normalized_y_buffer.minimum();
 
-		normalized_y_buffer.render(static_cast<AviUtl::PixelYC*>(fpip->ycp_edit));
+		normalized_y_buffer.render(fpip);
 
 		return true;
 	}
