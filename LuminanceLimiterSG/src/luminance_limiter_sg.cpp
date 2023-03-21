@@ -1,6 +1,7 @@
 #include "luminance_limiter_sg.h"
 
 #include <array>
+#include <limits>
 
 
 namespace luminance_limiter_sg {
@@ -82,6 +83,9 @@ namespace luminance_limiter_sg {
 	{
 		const auto scaled = peak + diff;
 		const auto scaled_range = scaled - peak;
+		if (scaled_range <= std::numeric_limits<NormalizedY>::epsilon()) {
+			return 1.0f;
+		}
 		const auto scale = scaled_range / range;
 		return scale;
 	}
