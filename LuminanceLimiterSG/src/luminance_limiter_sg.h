@@ -11,19 +11,21 @@ namespace luminance_limiter_sg {
 	using NormalizedY = float;
 	class NormalizedYBuffer {
 	public:
-		NormalizedYBuffer(AviUtl::FilterProcInfo* fpip);
+		NormalizedYBuffer(AviUtl::FilterProcInfo* fpip) noexcept;
 
-		NormalizedY maximum() const;
-		NormalizedY minimum() const;
+		NormalizedY maximum() const noexcept;
+		NormalizedY minimum() const noexcept;
 
 		template<typename F>
 		BOOL pixelwise_map(F f) {
-			for (auto& elem:this->buffer)
+			for (auto& elem : this->buffer)
 			{
 				elem = f(elem);
 			}
 			return true;
 		}
+
+		BOOL render(AviUtl::PixelYC* target) const noexcept;
 	private:
 		std::vector<NormalizedY> buffer;
 	};
