@@ -16,12 +16,12 @@
 
 namespace luminance_limiter_sg {
 	constexpr static inline auto name = "LuminanceLimiterSG";
-	constexpr static inline auto track_n = 8u;
+	constexpr static inline auto track_n = 9u;
 	constexpr static inline auto track_name =
-		std::array<const char*, track_n>{ "è„å¿", "è„å¿Ëáíl", "â∫å¿", "â∫å¿Ëáíl", "éùë±", "ÉQÉCÉì", "ñæÇÈÇ≥", "à√Ç≥"};
-	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 4096, -256, 256, 0, 0, 0, 0, 0 };
-	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, -4096, 0, 0, 0, -4096, -4096, -4096 };
-	constexpr static inline auto track_e = std::array<int32_t, track_n>{ 4096, 0, 4096, 4096, 60, 4096, 4096, 4096 };
+		std::array<const char*, track_n>{ "è„å¿", "è„å¿Ëáíl", "â∫å¿", "â∫å¿Ëáíl", "éùë±", "ó]âC", "ÉQÉCÉì", "ñæÇÈÇ≥", "à√Ç≥"};
+	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 4096, 0, 0, 0, 0, 0, 0, 0, 0 };
+	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, -4096, 0, 0, 0, 0, -4096, -4096, -4096 };
+	constexpr static inline auto track_e = std::array<int32_t, track_n>{ 4096, 0, 4096, 4096, 256, 256, 4096, 4096, 4096 };
 	constexpr static inline auto information = "LuminanceLimiterSG v0.2.0 by ëeêªåﬁí∑";
 
 	constexpr static inline auto y_max = 4096.0f;
@@ -189,7 +189,15 @@ namespace luminance_limiter_sg {
 
 	class PeakEnvelopeGenerator {
 	public:
+		BOOL set_limit(const NormalizedY top, const NormalizedY bottom) noexcept {
+			this->top_limit = top;
+			this->bottom_limit = bottom;
+			return true;
+		}
+
 		BOOL set_sustain(const uint32_t sustain) {
+			this->sustain = sustain;
+
 			if (sustain == 0)
 			{
 				this->top_peak_lifetime_buffer = std::nullopt;
@@ -255,7 +263,13 @@ namespace luminance_limiter_sg {
 			return true;
 		}
 
-		std::array<NormalizedY, 2> update_and_get_enveloped_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept {
+		BOOL set_release(const uint32_t release)
+		{
+			this->release = release;
+			return true;
+		}
+
+		std::array<NormalizedY, 2> hold_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept {
 			if (!top_peak_lifetime_buffer.has_value() || !active_top_peak_buffer.has_value()
 				|| !bottom_peak_lifetime_buffer.has_value() || !active_bottom_peak_buffer.has_value())
 			{
@@ -296,7 +310,64 @@ namespace luminance_limiter_sg {
 			}
 			const auto current_bottom_peak = active_bottom_peak_buffer.value().empty() ? bottom_peak : active_bottom_peak_buffer.value().front();
 
-			return { current_top_peak,current_bottom_peak };
+			return { current_top_peak, current_bottom_peak };
+		}
+
+		std::array<NormalizedY, 2> wrap_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept {
+			NormalizedY wraped_top;
+			if (ongoing_top_peak == top_peak)
+			{
+				wraped_top = top_peak;
+				top_peak_duration = 0u;
+			}
+			else
+			{
+				top_peak_duration++;
+				const auto coefficient = -ongoing_top_peak / static_cast<float>(release);
+				const auto slice = ongoing_top_peak + top_limit;
+				const auto released = coefficient * static_cast<float>(top_peak_duration) + slice;
+				if (top_peak >= released)
+				{
+					wraped_top = top_peak;
+					ongoing_top_peak = top_peak;
+					top_peak_duration = 0u;
+				}
+				else
+				{
+					wraped_top = released;
+				}
+			}
+
+			NormalizedY wraped_bottom;
+			if (ongoing_bottom_peak == bottom_peak)
+			{
+				wraped_bottom = bottom_peak;
+				bottom_peak_duration = 0u;
+			}
+			else
+			{
+				bottom_peak_duration++;
+				const auto coefficient = ongoing_bottom_peak / static_cast<float>(release);
+				const auto slice = ongoing_bottom_peak + bottom_limit;
+				const auto released = coefficient * static_cast<float>(bottom_peak_duration) + slice;
+				if (bottom_peak <= released)
+				{
+					wraped_bottom = bottom_peak;
+					ongoing_bottom_peak = bottom_peak;
+					bottom_peak_duration = 0u;
+				}
+				else
+				{
+					wraped_bottom = released;
+				}
+			}
+			return { wraped_top, wraped_bottom };
+		}
+
+		std::array<NormalizedY, 2> update_and_get_envelope_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept {
+			const auto [current_top_peak, current_bottom_peak] = hold_peaks(top_peak, bottom_peak);
+			const auto [wraped_top_peak, wraped_bottom_peak] = wrap_peaks(current_top_peak, current_bottom_peak);
+			return { wraped_top_peak, wraped_bottom_peak };
 		};
 
 	private:
@@ -304,6 +375,15 @@ namespace luminance_limiter_sg {
 		std::optional<std::deque<NormalizedY>> bottom_peak_lifetime_buffer = std::nullopt;
 		std::optional<std::deque<NormalizedY>> active_top_peak_buffer = std::nullopt;
 		std::optional<std::deque<NormalizedY>> active_bottom_peak_buffer = std::nullopt;
+		uint32_t sustain = 0u;
+		uint32_t release = 0u;
+		NormalizedY ongoing_top_peak = 0.0f;
+		uint32_t top_peak_duration = 0u;
+		NormalizedY ongoing_bottom_peak = 0.0f;
+		uint32_t bottom_peak_duration = 0u;
+
+		NormalizedY top_limit = 0.0f;
+		NormalizedY bottom_limit = 0.0f;
 	};
 
 	static auto peak_envelope_generator = PeakEnvelopeGenerator();
@@ -314,11 +394,11 @@ namespace luminance_limiter_sg {
 
 		const auto orig_top = normalized_y_buffer.maximum();
 		const auto orig_bottom = normalized_y_buffer.minimum();
-		const auto top_diff = normalize_y(fp->track[6]);
-		const auto bottom_diff = normalize_y(fp->track[7]);
+		const auto top_diff = normalize_y(fp->track[7]);
+		const auto bottom_diff = normalize_y(fp->track[8]);
 		const auto scale = make_scale(orig_top, orig_bottom, top_diff, bottom_diff);
 
-		const auto gain_val = normalize_y(fp->track[5]);
+		const auto gain_val = normalize_y(fp->track[6]);
 		const auto gain = make_gain(gain_val);
 
 		const auto scale_and_gain = [&](NormalizedY y) {return gain(scale(y)); };
@@ -327,13 +407,17 @@ namespace luminance_limiter_sg {
 		const auto top_threashold = top_limit + normalize_y(fp->track[1]);
 		const auto bottom_limit = normalize_y(fp->track[2]);
 		const auto bottom_threashold = bottom_limit + normalize_y(fp->track[3]);
-		const auto gained_top = scale_and_gain(orig_top);
-		const auto gained_bottom = scale_and_gain(orig_bottom);
+		peak_envelope_generator.set_limit(top_limit, bottom_limit);
 
 		const auto sustain = static_cast<uint32_t>(fp->track[4]);
 		peak_envelope_generator.set_sustain(sustain);
+		const auto release = static_cast<uint32_t>(fp->track[5]);
+		peak_envelope_generator.set_release(release);
+
+		const auto gained_top = scale_and_gain(orig_top);
+		const auto gained_bottom = scale_and_gain(orig_bottom);
 		const auto [enveloped_top, enveloped_bottom] =
-			peak_envelope_generator.update_and_get_enveloped_peaks(gained_top, gained_bottom);
+			peak_envelope_generator.update_and_get_envelope_peaks(gained_top, gained_bottom);
 
 		const auto character =
 			make_character(top_limit, top_threashold,
