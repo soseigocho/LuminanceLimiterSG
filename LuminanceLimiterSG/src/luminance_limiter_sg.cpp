@@ -126,34 +126,36 @@ namespace luminance_limiter_sg {
 	}
 
 	constexpr static inline auto make_character(
-		const NormalizedY top_limit, const NormalizedY top_threashold,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threashold,
+		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
+		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
 		const NormalizedY top_peak, const NormalizedY bottom_peak)
 	{
+		const auto top_threshold = top_limit + top_threshold_diff;
 		auto top_coefficient = 1.0f;
 		auto top_slice = 0.0f;
 		if (top_peak >= top_limit)
 		{
 			top_coefficient =
-				(top_limit - top_threashold) / (top_peak - top_threashold);
+				top_threshold_diff >= -std::numeric_limits<NormalizedY>::epsilon() ? 0.0f :  - top_threshold_diff / (top_peak - top_threshold);
 			top_slice = top_limit - top_peak * top_coefficient;
 		}
 
+		const auto bottom_threshold = bottom_limit + bottom_threshold_diff;
 		auto bottom_coefficient = 1.0f;
 		auto bottom_slice = 0.0f;
 		if (bottom_peak <= bottom_limit)
 		{
 			bottom_coefficient =
-				(bottom_limit - bottom_threashold) / (bottom_peak - bottom_threashold);
+				bottom_threshold_diff <= std::numeric_limits<NormalizedY>::epsilon() ? 0.0f : - bottom_threshold_diff / (bottom_peak - bottom_threshold);
 			bottom_slice = bottom_limit - bottom_peak * bottom_coefficient;
 		}
 
 		return [=](const NormalizedY y) -> NormalizedY {
-			if (y >= top_threashold)
+			if (y >= top_threshold)
 			{
 				return top_coefficient * y + top_slice;
 			}
-			else if (y < top_threashold && y > bottom_threashold)
+			else if (y < top_threshold && y > bottom_threshold)
 			{
 				return y;
 			}
@@ -190,8 +192,8 @@ namespace luminance_limiter_sg {
 	class PeakEnvelopeGenerator {
 	public:
 		BOOL set_limit(const NormalizedY top, const NormalizedY bottom) noexcept {
-			this->top_limit = top;
-			this->bottom_limit = bottom;
+			top_limit = top;
+			bottom_limit = bottom;
 			return true;
 		}
 
@@ -323,8 +325,8 @@ namespace luminance_limiter_sg {
 			else
 			{
 				top_peak_duration++;
-				const auto coefficient = -ongoing_top_peak / static_cast<float>(release);
-				const auto slice = ongoing_top_peak + top_limit;
+				const auto coefficient = (bottom_limit - ongoing_top_peak) / static_cast<float>(release);
+				const auto slice = ongoing_top_peak;
 				const auto released = coefficient * static_cast<float>(top_peak_duration) + slice;
 				if (top_peak >= released)
 				{
@@ -347,8 +349,8 @@ namespace luminance_limiter_sg {
 			else
 			{
 				bottom_peak_duration++;
-				const auto coefficient = ongoing_bottom_peak / static_cast<float>(release);
-				const auto slice = ongoing_bottom_peak + bottom_limit;
+				const auto coefficient = (top_limit - ongoing_bottom_peak) / static_cast<float>(release);
+				const auto slice = ongoing_bottom_peak;
 				const auto released = coefficient * static_cast<float>(bottom_peak_duration) + slice;
 				if (bottom_peak <= released)
 				{
@@ -366,8 +368,8 @@ namespace luminance_limiter_sg {
 
 		std::array<NormalizedY, 2> update_and_get_envelope_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept {
 			const auto [current_top_peak, current_bottom_peak] = hold_peaks(top_peak, bottom_peak);
-			const auto [wraped_top_peak, wraped_bottom_peak] = wrap_peaks(current_top_peak, current_bottom_peak);
-			return { wraped_top_peak, wraped_bottom_peak };
+			const auto [wrapped_top_peak, wrapped_bottom_peak] = wrap_peaks(current_top_peak, current_bottom_peak);
+			return { wrapped_top_peak, wrapped_bottom_peak };
 		};
 
 	private:
@@ -404,9 +406,9 @@ namespace luminance_limiter_sg {
 		const auto scale_and_gain = [&](NormalizedY y) {return gain(scale(y)); };
 
 		const auto top_limit = normalize_y(fp->track[0]);
-		const auto top_threashold = top_limit + normalize_y(fp->track[1]);
+		const auto top_threshold_diff = normalize_y(fp->track[1]);
 		const auto bottom_limit = normalize_y(fp->track[2]);
-		const auto bottom_threashold = bottom_limit + normalize_y(fp->track[3]);
+		const auto bottom_threshold_diff = normalize_y(fp->track[3]);
 		peak_envelope_generator.set_limit(top_limit, bottom_limit);
 
 		const auto sustain = static_cast<uint32_t>(fp->track[4]);
@@ -420,9 +422,9 @@ namespace luminance_limiter_sg {
 			peak_envelope_generator.update_and_get_envelope_peaks(gained_top, gained_bottom);
 
 		const auto character =
-			make_character(top_limit, top_threashold,
-				bottom_limit, bottom_threashold,
-				enveloped_top, enveloped_bottom);
+			make_character(top_limit, top_threshold_diff,
+				bottom_limit, bottom_threshold_diff,
+				gained_top, gained_bottom);
 
 		const auto limit = make_limit(character, top_limit, bottom_limit);
 
