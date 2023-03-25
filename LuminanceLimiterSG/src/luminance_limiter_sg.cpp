@@ -325,7 +325,7 @@ namespace luminance_limiter_sg {
 			else
 			{
 				top_peak_duration++;
-				const auto coefficient = (bottom_limit - ongoing_top_peak) / static_cast<float>(release);
+				const auto coefficient = - (ongoing_top_peak - bottom_limit) / static_cast<float>(release);
 				const auto slice = ongoing_top_peak;
 				const auto released = coefficient * static_cast<float>(top_peak_duration) + slice;
 				if (top_peak >= released)
@@ -349,7 +349,7 @@ namespace luminance_limiter_sg {
 			else
 			{
 				bottom_peak_duration++;
-				const auto coefficient = (top_limit - ongoing_bottom_peak) / static_cast<float>(release);
+				const auto coefficient = - (ongoing_bottom_peak - top_limit) / static_cast<float>(release);
 				const auto slice = ongoing_bottom_peak;
 				const auto released = coefficient * static_cast<float>(bottom_peak_duration) + slice;
 				if (bottom_peak <= released)
