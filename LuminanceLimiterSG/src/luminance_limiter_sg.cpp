@@ -12,16 +12,17 @@
 #include <deque>
 #include <limits>
 #include <optional>
+#include <stdexcept>
 
 
 namespace luminance_limiter_sg {
 	constexpr static inline auto name = "LuminanceLimiterSG";
-	constexpr static inline auto track_n = 9u;
+	constexpr static inline auto track_n = 10u;
 	constexpr static inline auto track_name =
-		std::array<const char*, track_n>{ "è„å¿", "è„å¿Ëáíl", "â∫å¿", "â∫å¿Ëáíl", "éùë±", "ó]âC", "ÉQÉCÉì", "ñæÇÈÇ≥", "à√Ç≥"};
-	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 4096, 0, 0, 0, 0, 0, 0, 0, 0 };
-	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, -4096, 0, 0, 0, 0, -4096, -4096, -4096 };
-	constexpr static inline auto track_e = std::array<int32_t, track_n>{ 4096, 0, 4096, 4096, 256, 256, 4096, 4096, 4096 };
+		std::array<const char*, track_n>{ "è„å¿", "è„å¿Ëáíl", "â∫å¿", "â∫å¿Ëáíl", "ï‚ä‘”∞ƒﬁ", "éùë±", "ó]âC", "µÃæØƒ", "ñæÇÈÇ≥", "à√Ç≥"};
+	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 4096, -1024, 256, 512, 0, 4, 8, -128, 512, -64 };
+	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, -4096, 0, 0, 0, 0, 0, -4096, -4096, -4096 };
+	constexpr static inline auto track_e = std::array<int32_t, track_n>{ 4096, 0, 4096, 4096, 0, 256, 256, 4096, 4096, 4096 };
 	constexpr static inline auto information = "LuminanceLimiterSG v0.2.0 by ëeêªåﬁí∑";
 
 	constexpr static inline auto y_max = 4096.0f;
@@ -125,45 +126,93 @@ namespace luminance_limiter_sg {
 		return [=](NormalizedY y) {return y + gain; };
 	}
 
-	constexpr static inline auto make_character(
+	enum class InterporationMode
+	{
+		Linear,
+	};
+
+	constexpr static inline auto lienar_interp(const std::vector<float>&& xs, const std::vector<float>&& ys)
+	{
+		if (xs.size() != ys.size())
+		{
+			throw std::runtime_error("Error: xs and ys must have the same size.");
+		}
+
+		if (xs.size() < 2)
+		{
+			throw std::runtime_error("Error: xs and ys must have at least 2 elements.");
+		}
+
+		auto n = xs.size();
+		auto t = [=](float x, size_t i) {
+			if (x < xs[i] || x > xs[i + 1])
+			{
+				throw std::range_error("Error: x is out of range.");
+			}
+			return (x - xs[i]) / (xs[i + 1] - xs[i]);
+		};
+
+		std::vector<float> slopes(n - 1);
+		for (auto i = 0; i < n - 1; ++i)
+		{
+			slopes[i] = (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]);
+		}
+
+		return [=](float x) -> float {
+			if (x < xs[0] || x>xs[n - 1])
+			{
+				throw std::range_error("Error: x is out of range.");
+			}
+
+			auto left = 0;
+			auto right = n - 1;
+			while (left + 1 < right)
+			{
+				const auto mid = (left + right) / 2;
+				if (xs[mid] <= x)
+				{
+					left = mid;
+				}
+				else
+				{
+					right = mid;
+				}
+			}
+
+			const auto idx = left;
+			return ys[idx] + slopes[idx] * (x - xs[idx]) * t(x, idx);
+		};
+	}
+
+	constexpr static inline auto make_linear_character(
 		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
 		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
 		const NormalizedY top_peak, const NormalizedY bottom_peak)
 	{
 		const auto top_threshold = top_limit + top_threshold_diff;
-		auto top_coefficient = 1.0f;
-		auto top_slice = 0.0f;
-		if (top_peak >= top_limit)
-		{
-			top_coefficient =
-				top_threshold_diff >= -std::numeric_limits<NormalizedY>::epsilon() ? 0.0f :  - top_threshold_diff / (top_peak - top_threshold);
-			top_slice = top_limit - top_peak * top_coefficient;
-		}
-
 		const auto bottom_threshold = bottom_limit + bottom_threshold_diff;
-		auto bottom_coefficient = 1.0f;
-		auto bottom_slice = 0.0f;
-		if (bottom_peak <= bottom_limit)
-		{
-			bottom_coefficient =
-				bottom_threshold_diff <= std::numeric_limits<NormalizedY>::epsilon() ? 0.0f : - bottom_threshold_diff / (bottom_peak - bottom_threshold);
-			bottom_slice = bottom_limit - bottom_peak * bottom_coefficient;
-		}
+		const auto x0 = bottom_peak <= bottom_limit ? bottom_peak : bottom_limit;
+		const auto x3 = top_peak >= top_limit ? top_peak : top_limit;
+		auto xs = std::vector{ x0, bottom_threshold, top_threshold, x3 };
+		std::sort(xs.begin(), xs.end());
+		auto ys = std::vector{ bottom_limit, bottom_threshold, top_threshold, top_limit };
+		std::sort(ys.begin(), ys.end());
+		return lienar_interp(std::move(xs), std::move(ys));
+	}
 
-		return [=](const NormalizedY y) -> NormalizedY {
-			if (y >= top_threshold)
-			{
-				return top_coefficient * y + top_slice;
-			}
-			else if (y < top_threshold && y > bottom_threshold)
-			{
-				return y;
-			}
-			else
-			{
-				return bottom_coefficient * y + bottom_slice;
-			}
-		};
+	constexpr static inline auto make_character(
+		const InterporationMode mode,
+		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
+		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
+		const NormalizedY top_peak, const NormalizedY bottom_peak)
+	{
+		switch (mode)
+		{
+		case InterporationMode::Linear:
+			return make_linear_character(top_limit, top_threshold_diff, bottom_limit, bottom_threshold_diff, top_peak, bottom_peak);
+		default:
+			throw std::runtime_error("Error: Illegal interpolation mode.");
+		}
 	}
 
 	template <typename F>
@@ -325,7 +374,7 @@ namespace luminance_limiter_sg {
 			else
 			{
 				top_peak_duration++;
-				const auto coefficient = - (ongoing_top_peak - bottom_limit) / static_cast<float>(release);
+				const auto coefficient = -(ongoing_top_peak - bottom_limit) / static_cast<float>(release);
 				const auto slice = ongoing_top_peak;
 				const auto released = coefficient * static_cast<float>(top_peak_duration) + slice;
 				if (top_peak >= released)
@@ -349,7 +398,7 @@ namespace luminance_limiter_sg {
 			else
 			{
 				bottom_peak_duration++;
-				const auto coefficient = - (ongoing_bottom_peak - top_limit) / static_cast<float>(release);
+				const auto coefficient = -(ongoing_bottom_peak - top_limit) / static_cast<float>(release);
 				const auto slice = ongoing_bottom_peak;
 				const auto released = coefficient * static_cast<float>(bottom_peak_duration) + slice;
 				if (bottom_peak <= released)
@@ -396,11 +445,11 @@ namespace luminance_limiter_sg {
 
 		const auto orig_top = normalized_y_buffer.maximum();
 		const auto orig_bottom = normalized_y_buffer.minimum();
-		const auto top_diff = normalize_y(fp->track[7]);
-		const auto bottom_diff = normalize_y(fp->track[8]);
+		const auto top_diff = normalize_y(fp->track[8]);
+		const auto bottom_diff = normalize_y(fp->track[9]);
 		const auto scale = make_scale(orig_top, orig_bottom, top_diff, bottom_diff);
 
-		const auto gain_val = normalize_y(fp->track[6]);
+		const auto gain_val = normalize_y(fp->track[7]);
 		const auto gain = make_gain(gain_val);
 
 		const auto scale_and_gain = [&](NormalizedY y) {return gain(scale(y)); };
@@ -411,9 +460,9 @@ namespace luminance_limiter_sg {
 		const auto bottom_threshold_diff = normalize_y(fp->track[3]);
 		peak_envelope_generator.set_limit(top_limit, bottom_limit);
 
-		const auto sustain = static_cast<uint32_t>(fp->track[4]);
+		const auto sustain = static_cast<uint32_t>(fp->track[5]);
 		peak_envelope_generator.set_sustain(sustain);
-		const auto release = static_cast<uint32_t>(fp->track[5]);
+		const auto release = static_cast<uint32_t>(fp->track[6]);
 		peak_envelope_generator.set_release(release);
 
 		const auto gained_top = scale_and_gain(orig_top);
@@ -421,8 +470,10 @@ namespace luminance_limiter_sg {
 		const auto [enveloped_top, enveloped_bottom] =
 			peak_envelope_generator.update_and_get_envelope_peaks(gained_top, gained_bottom);
 
+		const auto limit_character_interpolation_mode = static_cast<InterporationMode>(fp->track[4]);
 		const auto character =
-			make_character(top_limit, top_threshold_diff,
+			make_character(limit_character_interpolation_mode,
+				top_limit, top_threshold_diff,
 				bottom_limit, bottom_threshold_diff,
 				gained_top, gained_bottom);
 
