@@ -146,14 +146,6 @@ namespace luminance_limiter_sg {
 		}
 
 		auto n = xs.size();
-		auto t = [=](float x, size_t i) {
-			if (x < xs[i] || x > xs[i + 1])
-			{
-				throw std::range_error("Error: x is out of range.");
-			}
-			return (x - xs[i]) / (xs[i + 1] - xs[i]);
-		};
-
 		std::vector<float> slopes(n - 1);
 		for (auto i = 0; i < n - 1; ++i)
 		{
