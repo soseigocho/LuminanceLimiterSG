@@ -10,6 +10,7 @@
 
 #include <array>
 #include <deque>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <stdexcept>
@@ -22,7 +23,7 @@ namespace luminance_limiter_sg {
 		std::array<const char*, track_n>{ "è„å¿", "è„å¿Ëáíl", "â∫å¿", "â∫å¿Ëáíl", "ï‚ä‘”∞ƒﬁ", "éùë±", "ó]âC", "µÃæØƒ", "ñæÇÈÇ≥", "à√Ç≥"};
 	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 4096, -1024, 256, 512, 0, 4, 8, -128, 512, -64 };
 	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, -4096, 0, 0, 0, 0, 0, -4096, -4096, -4096 };
-	constexpr static inline auto track_e = std::array<int32_t, track_n>{ 4096, 0, 4096, 4096, 0, 256, 256, 4096, 4096, 4096 };
+	constexpr static inline auto track_e = std::array<int32_t, track_n>{ 4096, 0, 4096, 4096, 1, 256, 256, 4096, 4096, 4096 };
 	constexpr static inline auto information = "LuminanceLimiterSG v0.2.0 by ëeêªåﬁí∑";
 
 	constexpr static inline auto y_max = 4096.0f;
@@ -129,6 +130,7 @@ namespace luminance_limiter_sg {
 	enum class InterporationMode
 	{
 		Linear,
+		Lagrange,
 	};
 
 	constexpr static inline auto lienar_interp(const std::vector<float>&& xs, const std::vector<float>&& ys)
@@ -159,7 +161,7 @@ namespace luminance_limiter_sg {
 		}
 
 		return [=](float x) -> float {
-			if (x < xs[0] || x>xs[n - 1])
+			if (x < xs[0] || x > xs[n - 1])
 			{
 				throw std::range_error("Error: x is out of range.");
 			}
@@ -184,6 +186,36 @@ namespace luminance_limiter_sg {
 		};
 	}
 
+	constexpr static inline auto lagrange_interp(const std::vector<float>&& xs, const std::vector<float>&& ys)
+	{
+		if (xs.size() != ys.size())
+		{
+			throw std::runtime_error("Error: xs and ys must have the same size.");
+		}
+
+		if (xs.size() < 2)
+		{
+			throw std::runtime_error("Error: xs and ys must have at least 2 elements.");
+		}
+
+		return [=](float x) {
+			auto sum = 0.0f;
+			for (auto i = 0; i < xs.size(); ++i)
+			{
+				auto prod = 1.0f;
+				for (auto j = 0; j < xs.size(); ++j)
+				{
+					if (i != j)
+					{
+						prod *= (x - xs[j]) / (xs[i] - xs[j]);
+					}
+				}
+				sum += ys[i] * prod;
+			}
+			return sum;
+		};
+	}
+
 	constexpr static inline auto make_linear_character(
 		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
 		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
@@ -200,7 +232,23 @@ namespace luminance_limiter_sg {
 		return lienar_interp(std::move(xs), std::move(ys));
 	}
 
-	constexpr static inline auto make_character(
+	constexpr static inline auto make_lagrange_character(
+		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
+		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
+		const NormalizedY top_peak, const NormalizedY bottom_peak)
+	{
+		const auto top_threshold = top_limit + top_threshold_diff;
+		const auto bottom_threshold = bottom_limit + bottom_threshold_diff;
+		const auto x0 = bottom_peak <= bottom_limit ? bottom_peak : bottom_limit;
+		const auto x3 = top_peak >= top_limit ? top_peak : top_limit;
+		auto xs = std::vector{ x0, bottom_threshold, top_threshold, x3 };
+		std::sort(xs.begin(), xs.end());
+		auto ys = std::vector{ bottom_limit, bottom_threshold, top_threshold, top_limit };
+		std::sort(ys.begin(), ys.end());
+		return lagrange_interp(std::move(xs), std::move(ys));
+	}
+
+	const static inline std::function<float(float)> make_character(
 		const InterporationMode mode,
 		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
 		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
@@ -210,6 +258,8 @@ namespace luminance_limiter_sg {
 		{
 		case InterporationMode::Linear:
 			return make_linear_character(top_limit, top_threshold_diff, bottom_limit, bottom_threshold_diff, top_peak, bottom_peak);
+		case InterporationMode::Lagrange:
+			return make_lagrange_character(top_limit, top_threshold_diff, bottom_limit, bottom_threshold_diff, top_peak, bottom_peak);
 		default:
 			throw std::runtime_error("Error: Illegal interpolation mode.");
 		}
