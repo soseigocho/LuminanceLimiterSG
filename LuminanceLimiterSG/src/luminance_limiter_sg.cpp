@@ -182,7 +182,7 @@ namespace luminance_limiter_sg {
 			}
 
 			const auto idx = left;
-			return ys[idx] + slopes[idx] * (x - xs[idx]) * t(x, idx);
+			return ys[idx] + slopes[idx] * (x - xs[idx]);
 		};
 	}
 
