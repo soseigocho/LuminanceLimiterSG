@@ -23,7 +23,7 @@ namespace luminance_limiter_sg {
 		std::array<const char*, track_n>{ "è„å¿", "è„å¿Ëáíl", "â∫å¿", "â∫å¿Ëáíl", "ï‚ä‘”∞ƒﬁ", "éùë±", "ó]âC", "µÃæØƒ", "ñæÇÈÇ≥", "à√Ç≥"};
 	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 4096, -1024, 256, 512, 0, 4, 8, -128, 512, -64 };
 	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, -4096, 0, 0, 0, 0, 0, -4096, -4096, -4096 };
-	constexpr static inline auto track_e = std::array<int32_t, track_n>{ 4096, 0, 4096, 4096, 1, 256, 256, 4096, 4096, 4096 };
+	constexpr static inline auto track_e = std::array<int32_t, track_n>{ 4096, 0, 4096, 4096, 2, 256, 256, 4096, 4096, 4096 };
 	constexpr static inline auto information = "LuminanceLimiterSG v0.2.0 by ëeêªåﬁí∑";
 
 	constexpr static inline auto y_max = 4096.0f;
@@ -131,6 +131,7 @@ namespace luminance_limiter_sg {
 	{
 		Linear,
 		Lagrange,
+		Spline
 	};
 
 	constexpr static inline auto lienar_interp(const std::vector<float>&& xs, const std::vector<float>&& ys)
@@ -208,6 +209,163 @@ namespace luminance_limiter_sg {
 		};
 	}
 
+	constexpr static inline auto forward_elimination(
+		const std::vector<std::vector<float>>& a, const std::vector<float>& b,
+		std::vector<std::vector<float>>& buf_a, std::vector<float> buf_b)
+	{
+		for (auto i = 0; i < a.size() - 1; i++)
+		{
+			for (auto j = 0; j < a[i].size(); j++)
+			{
+				buf_a[i][j] = a[i][j] / a[i][i];
+			}
+			buf_b[i] = b[i] / a[i][i];
+
+			for (auto next_is = i + 1; next_is < a.size(); next_is++)
+			{
+				for (auto j = 0; j < a[i].size(); j++)
+				{
+					buf_a[next_is][j] = a[next_is][j] - buf_a[next_is][i];
+				}
+			}
+		}
+	}
+
+	constexpr static inline auto gaussian_elimination(const std::vector<std::vector<float>>& a, const std::vector<float>& b)
+	{
+		auto temp_a = std::vector(a);
+		auto temp_b = std::vector(b);
+		forward_elimination(a, b, temp_a, temp_b);
+	}
+
+	constexpr static inline auto spline_interp(const std::vector<float>&& xs, const std::vector<float>&& ys)
+	{
+		if (xs.size() != ys.size())
+		{
+			throw std::runtime_error("Error: xs and ys must have the same size.");
+		}
+
+		if (xs.size() < 2)
+		{
+			throw std::runtime_error("Error: xs and ys must have at least 2 elements.");
+		}
+
+		const auto n = xs.size() - 1;
+
+		auto as = std::vector<float>(xs.size());
+		for (auto i = 0; i <= n; i++)
+		{
+			as[i] = ys[i];
+		}
+
+		auto hs = std::vector<float>(n);
+		for (auto i = 0; i < n; i++)
+		{
+			hs[i] = xs[i + 1] - xs[i];
+		}
+
+		auto am = std::vector<std::vector<float>>(std::vector<std::vector<float>>(xs.size()));
+		for (auto i = 0; i <=n; i++)
+		{
+			am[i] = std::vector<float>(xs.size());
+		}
+		for (auto i = 0; i <= n; i++)
+		{
+			for (auto j = 0; j < xs.size(); j++)
+			{
+				if (i == 0 && j == 0)
+				{
+					am[i][j] = 1;
+				}
+				else if (i == n && j == n)
+				{
+					am[i][j] = 1;
+				}
+				else if (i != 0 && i != n && i == (j + 1))
+				{
+					am[i][j] = hs[i - 1];
+				}
+				else if (i != 0 && i != n && i == j)
+				{
+					am[i][j] = 2 * (hs[i - 1] + hs[j]);
+				}
+				else if (i != 0 && i != n && i == (j - 1))
+				{
+					am[i][j] = hs[j];
+				}
+				else
+				{
+					am[i][j] = 0;
+				}
+			}
+		}
+
+		auto prod_bs = std::vector<float>(xs.size());
+		for (auto i = 0; i <= n; i++)
+		{
+			if (i == 0 || i == n)
+			{
+				prod_bs[i] = 0;
+			}
+			else
+			{
+				prod_bs[i] = 3 * ((as[i + 1] - as[i]) / hs[i] - (as[i] - as[i - 1]) / hs[i-1]);
+			}
+		}
+
+		auto cs = gaussian_elimination(am, prod_bs);
+
+		auto ws = std::vector<float>(xs.size());
+		for (auto i = 0; i < n; i++)
+		{
+			if (i == 0)
+			{
+				ws[i] = 0.0;
+			}
+			else
+			{
+				auto denominator = 4.0 - ws[i - 1];
+				cs[i] = (cs[i] - cs[i - 1]) / denominator;
+				ws[i] = 1.0 / denominator;
+			}
+		}
+
+		for (auto i = n - 1; i > 0; i--)
+		{
+			cs[i] = cs[i] - cs[i + 1] * ws[i];
+		}
+
+		auto bs = std::vector<float>(xs.size());
+		auto ds = std::vector<float>(xs.size());
+		for (auto i = 0; i <= n; i++)
+		{
+			if (i == n)
+			{
+				bs[i] = 0.0;
+				ds[i] = 0.0;
+			}
+			else
+			{
+				ds[i] = (cs[i + 1] - cs[i]) / (3.0 * hs[i]);
+				bs[i] = (as[i + 1] - as[i]) / hs[i] - cs[i] * hs[i] - ds[i] * hs[i] * hs[i];
+			}
+		}
+		return [=](float x) {
+			auto j = int(std::floor(x));
+			if (j < 0)
+			{
+				j = 0;
+			}
+			else if (j >= as.size())
+			{
+				j = as.size() - 1;
+			}
+
+			auto dt = x - j;
+			return as[j] + (bs[j] + (cs[j] + ds[j] * dt) * dt) * dt;
+			};
+	}
+
 	constexpr static inline auto make_linear_character(
 		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
 		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
@@ -240,6 +398,36 @@ namespace luminance_limiter_sg {
 		return lagrange_interp(std::move(xs), std::move(ys));
 	}
 
+	template<typename F>
+	constexpr static inline auto make_some_charactors(
+		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
+		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
+		const NormalizedY top_peak, const NormalizedY bottom_peak,
+		F interp_method)
+	{
+		const auto top_threshold = top_limit + top_threshold_diff;
+		const auto bottom_threshold = bottom_limit + bottom_threshold_diff;
+		const auto x0 = bottom_peak <= bottom_limit ? bottom_peak : bottom_limit;
+		const auto x3 = top_peak >= top_limit ? top_peak : top_limit;
+		auto xs = std::vector{ x0, bottom_threshold, top_threshold, x3 };
+		std::sort(xs.begin(), xs.end());
+		auto ys = std::vector{ bottom_limit, bottom_threshold, top_threshold, top_limit };
+		std::sort(ys.begin(), ys.end());
+		return interp_method(std::move(xs), std::move(ys));
+	}
+
+	constexpr static inline auto make_spline_character(
+		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
+		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
+		const NormalizedY top_peak, const NormalizedY bottom_peak)
+	{
+		return make_some_charactors(
+			top_limit, top_threshold_diff,
+			bottom_limit, bottom_threshold_diff,
+			top_peak, bottom_peak,
+			spline_interp);
+	}
+
 	const static inline std::function<float(float)> make_character(
 		const InterporationMode mode,
 		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
@@ -252,6 +440,8 @@ namespace luminance_limiter_sg {
 			return make_linear_character(top_limit, top_threshold_diff, bottom_limit, bottom_threshold_diff, top_peak, bottom_peak);
 		case InterporationMode::Lagrange:
 			return make_lagrange_character(top_limit, top_threshold_diff, bottom_limit, bottom_threshold_diff, top_peak, bottom_peak);
+		case InterporationMode::Spline:
+			return make_spline_character(top_limit, top_threshold_diff, bottom_limit, bottom_threshold_diff, top_peak, bottom_peak);
 		default:
 			throw std::runtime_error("Error: Illegal interpolation mode.");
 		}
