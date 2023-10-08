@@ -127,7 +127,7 @@ namespace luminance_limiter_sg {
 		return [=](NormalizedY y) {return y + gain; };
 	}
 
-	enum class InterporationMode
+	enum class interpolationMode
 	{
 		Linear,
 		Lagrange,
@@ -433,15 +433,15 @@ namespace luminance_limiter_sg {
 		std::function<float(float)>(
 			NormalizedY, NormalizedY,
 			NormalizedY, NormalizedY,
-			NormalizedY, NormalizedY)> select_character(InterporationMode mode)
+			NormalizedY, NormalizedY)> select_character(interpolationMode mode)
 	{
 		switch (mode)
 		{
-		case InterporationMode::Linear:
+		case interpolationMode::Linear:
 			return make_linear_character;
-		case InterporationMode::Lagrange:
+		case interpolationMode::Lagrange:
 			return make_lagrange_character;
-		case InterporationMode::Spline:
+		case interpolationMode::Spline:
 			return make_spline_character;
 		default:
 			throw std::runtime_error("Error: Illegal interpolation mode.");
@@ -713,7 +713,7 @@ namespace luminance_limiter_sg {
 		const auto [enveloped_top, enveloped_bottom] =
 			peak_envelope_generator.update_and_get_envelope_peaks(gained_top, gained_bottom);
 
-		const auto limit_character_interpolation_mode = static_cast<InterporationMode>(fp->track[4]);
+		const auto limit_character_interpolation_mode = static_cast<interpolationMode>(fp->track[4]);
 		const auto character =
 			make_character(
 				top_limit, top_threshold_diff,
