@@ -209,33 +209,56 @@ namespace luminance_limiter_sg {
 		};
 	}
 
-	constexpr static inline auto forward_elimination(
-		const std::vector<std::vector<float>>& a, const std::vector<float>& b,
-		std::vector<std::vector<float>>& buf_a, std::vector<float> buf_b)
+	constexpr static inline auto tdma(const std::vector<float>& a, const std::vector<float>& b, const std::vector<float>& c, const std::vector<float>& d)
 	{
-		for (auto i = 0; i < a.size() - 1; i++)
-		{
-			for (auto j = 0; j < a[i].size(); j++)
-			{
-				buf_a[i][j] = a[i][j] / a[i][i];
-			}
-			buf_b[i] = b[i] / a[i][i];
+		auto n = a.size() - 1;
+		auto p = std::vector<float>(a.size());
+		auto q = std::vector<float>(a.size());
 
-			for (auto next_is = i + 1; next_is < a.size(); next_is++)
-			{
-				for (auto j = 0; j < a[i].size(); j++)
-				{
-					buf_a[next_is][j] = a[next_is][j] - buf_a[next_is][i];
-				}
-			}
+		p[0] = -b[0] / a[0];
+		q[0] = d[0] / a[0];
+
+		for (auto i = 1; i < a.size(); i++)
+		{
+			p[i] = -b[i] / (a[i] + c[i] * p[i - 1]);
+			q[i] = (d[i] - c[i] * q[i - 1]) / (a[i] + c[i] * p[i - 1]);
+		}
+
+		auto x = std::vector<float>(a.size());
+		x[n] = q[n];
+		for (auto i = n - 1; i > -1; i--)
+		{
+			x[i] = p[i] * x[i + 1] + q[i];
+		}
+
+		return x;
+	}
+
+	constexpr static inline std::optional<int> inner_binary_search(const std::vector<float>& xs, const float x, const int max_idx, const int min_idx)
+	{
+		if (max_idx < min_idx)
+		{
+			return std::nullopt;
+		}
+
+		auto mid_idx = min_idx + (max_idx - min_idx) / 2;
+		if (xs[mid_idx] > x)
+		{
+			return inner_binary_search(xs, x, min_idx, mid_idx - 1);
+		}
+		else if (xs[mid_idx] < x)
+		{
+			return inner_binary_search(xs, x, mid_idx + 1, max_idx);
+		}
+		else
+		{
+			return mid_idx;
 		}
 	}
 
-	constexpr static inline auto gaussian_elimination(const std::vector<std::vector<float>>& a, const std::vector<float>& b)
+	constexpr static inline auto binary_search(const std::vector<float>& xs, const float x)
 	{
-		auto temp_a = std::vector(a);
-		auto temp_b = std::vector(b);
-		forward_elimination(a, b, temp_a, temp_b);
+		return inner_binary_search(xs, x, 0, xs.size() - 1);
 	}
 
 	constexpr static inline auto spline_interp(const std::vector<float>&& xs, const std::vector<float>&& ys)
@@ -253,7 +276,7 @@ namespace luminance_limiter_sg {
 		const auto n = xs.size() - 1;
 
 		auto as = std::vector<float>(xs.size());
-		for (auto i = 0; i <= n; i++)
+		for (auto i = 0; i < xs.size(); i++)
 		{
 			as[i] = ys[i];
 		}
@@ -264,76 +287,67 @@ namespace luminance_limiter_sg {
 			hs[i] = xs[i + 1] - xs[i];
 		}
 
-		auto am = std::vector<std::vector<float>>(std::vector<std::vector<float>>(xs.size()));
-		for (auto i = 0; i <=n; i++)
-		{
-			am[i] = std::vector<float>(xs.size());
-		}
-		for (auto i = 0; i <= n; i++)
-		{
-			for (auto j = 0; j < xs.size(); j++)
-			{
-				if (i == 0 && j == 0)
-				{
-					am[i][j] = 1;
-				}
-				else if (i == n && j == n)
-				{
-					am[i][j] = 1;
-				}
-				else if (i != 0 && i != n && i == (j + 1))
-				{
-					am[i][j] = hs[i - 1];
-				}
-				else if (i != 0 && i != n && i == j)
-				{
-					am[i][j] = 2 * (hs[i - 1] + hs[j]);
-				}
-				else if (i != 0 && i != n && i == (j - 1))
-				{
-					am[i][j] = hs[j];
-				}
-				else
-				{
-					am[i][j] = 0;
-				}
-			}
-		}
-
-		auto prod_bs = std::vector<float>(xs.size());
-		for (auto i = 0; i <= n; i++)
-		{
-			if (i == 0 || i == n)
-			{
-				prod_bs[i] = 0;
-			}
-			else
-			{
-				prod_bs[i] = 3 * ((as[i + 1] - as[i]) / hs[i] - (as[i] - as[i - 1]) / hs[i-1]);
-			}
-		}
-
-		auto cs = gaussian_elimination(am, prod_bs);
-
-		auto ws = std::vector<float>(xs.size());
-		for (auto i = 0; i < n; i++)
+		auto aas = std::vector<float>(xs.size());
+		for (auto i = 0; i < xs.size(); i++)
 		{
 			if (i == 0)
 			{
-				ws[i] = 0.0;
+				aas[i] = 1;
+			}
+			else if (i == n)
+			{
+				aas[i] = 0;
 			}
 			else
 			{
-				auto denominator = 4.0 - ws[i - 1];
-				cs[i] = (cs[i] - cs[i - 1]) / denominator;
-				ws[i] = 1.0 / denominator;
+				aas[i] = 2 * (hs[i - 1] + hs[i]);
 			}
 		}
 
-		for (auto i = n - 1; i > 0; i--)
+		auto abs = std::vector<float>(xs.size());
+		for (auto i = 0; i < xs.size(); i++)
 		{
-			cs[i] = cs[i] - cs[i + 1] * ws[i];
+			if (i == 0)
+			{
+				abs[i] = 0;
+			}
+			else if (i == n)
+			{
+				abs[i] = 1;
+			}
+			else
+			{
+				abs[i] = hs[i];
+			}
 		}
+
+		auto acs = std::vector<float>(xs.size());
+		for (auto i = 0; i < xs.size(); i++)
+		{
+			if (i == 0)
+			{
+				acs[i] = 0;
+			}
+			else
+			{
+				acs[i] = hs[i - 1];
+			}
+		}
+
+		auto prod_b = std::vector<float>(xs.size());
+		for (auto i = 0; i < xs.size(); i++)
+		{
+			if (i == 0 || i == n)
+			{
+				prod_b[i] = 0;
+			}
+			else
+			{
+				prod_b[i] = 3 * ((as[i + 1] - as[i]) / hs[i] - (as[i] - as[i - 1]) / hs[i-1]);
+			}
+		}
+
+		auto cs = tdma(aas, abs, acs, prod_b);
 
 		auto bs = std::vector<float>(xs.size());
 		auto ds = std::vector<float>(xs.size());
@@ -346,23 +360,18 @@ namespace luminance_limiter_sg {
 			}
 			else
 			{
+				bs[i] = (as[i + 1] - as[i]) / hs[i] - hs[i] * (cs[i + 1] + 2 * cs[i]) / 3;
 				ds[i] = (cs[i + 1] - cs[i]) / (3.0 * hs[i]);
-				bs[i] = (as[i + 1] - as[i]) / hs[i] - cs[i] * hs[i] - ds[i] * hs[i] * hs[i];
 			}
 		}
-		return [=](float x) {
-			auto j = int(std::floor(x));
-			if (j < 0)
-			{
-				j = 0;
-			}
-			else if (j >= as.size())
-			{
-				j = as.size() - 1;
-			}
 
-			auto dt = x - j;
-			return as[j] + (bs[j] + (cs[j] + ds[j] * dt) * dt) * dt;
+		return [=](float x) {
+			auto opt_i = binary_search(xs, x);
+
+			auto i = opt_i.value_or((x > xs[0]) ? 0 : (xs.size() - 1));
+
+			auto dt = x - xs[i];
+			return as[i] + (bs[i] + (cs[i] + ds[i] * dt) * dt) * dt;
 			};
 	}
 
