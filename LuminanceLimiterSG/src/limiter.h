@@ -43,7 +43,7 @@ namespace luminance_limiter_sg {
 		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
 		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
 		const NormalizedY top_peak, const NormalizedY bottom_peak,
-		F interp_method)
+		const F&& interp_method)
 	{
 		const auto top_threshold = top_limit + top_threshold_diff;
 		const auto bottom_threshold = bottom_limit + bottom_threshold_diff;
@@ -103,18 +103,18 @@ namespace luminance_limiter_sg {
 		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
 		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
 		const NormalizedY top_peak, const NormalizedY bottom_peak,
-		F character)
+		const F&& character)
 	{
 		return character(top_limit, top_threshold_diff, bottom_limit, bottom_threshold_diff, top_peak, bottom_peak);
 	}
 
 	template <typename F>
 	constexpr static inline auto make_limit(
-		const F& character,
+		const F&& character,
 		const NormalizedY top_limit,
 		const NormalizedY bottom_limit)
 	{
-		return [=, &character](const NormalizedY y) -> NormalizedY {
+		return [=, character = std::move(character)](const NormalizedY y) -> NormalizedY {
 			const auto charactered = character(y);
 			if (charactered > top_limit)
 			{
@@ -148,8 +148,8 @@ namespace luminance_limiter_sg {
 		NormalizedY scale_and_gain(const NormalizedY y) const;
 		NormalizedY limit(const NormalizedY y) const;
 	private:
-		std::optional<std::function<float(float)>> scale = std::nullopt;
-		std::optional<std::function<float(float)>> gain = std::nullopt;
-		std::optional<std::function<NormalizedY(NormalizedY)>> limiter = std::nullopt;
+		std::function<float(float)> scale;
+		std::function<float(float)> gain;
+		std::function<NormalizedY(NormalizedY)> limiter;
 	};
 }

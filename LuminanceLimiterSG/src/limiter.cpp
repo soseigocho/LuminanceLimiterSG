@@ -336,16 +336,17 @@ namespace luminance_limiter_sg {
 				top_peak, bottom_peak,
 				select_character(mode)),
 			top_limit, bottom_limit);
+
 		return true;
 	}
 
 	NormalizedY Limiter::scale_and_gain(const NormalizedY y) const
 	{
-		return this->gain.value_or(id)(this->scale.value_or(id)(y));
+		return this->gain(this->scale(y));
 	}
 
 	NormalizedY Limiter::limit(const NormalizedY y) const
 	{
-		return this->limiter.value_or(id)(y);
+		return this->limiter(y);
 	}
 }

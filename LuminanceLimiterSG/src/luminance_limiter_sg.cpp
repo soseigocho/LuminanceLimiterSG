@@ -93,8 +93,8 @@ namespace luminance_limiter_sg {
 		return true;
 	}
 
-	auto peak_envelope_generator = PeakEnvelopeGenerator();
-	auto limiter = Limiter();
+	static auto peak_envelope_generator = PeakEnvelopeGenerator();
+	static auto limiter = Limiter();
 
 	static inline BOOL func_proc(AviUtl::FilterPlugin* fp, AviUtl::FilterProcInfo* fpip)
 	{
