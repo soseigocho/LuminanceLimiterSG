@@ -13,6 +13,7 @@
 namespace luminance_limiter_sg {
 	constexpr static inline auto stretch_scale(const NormalizedY peak, const NormalizedY threashold, const NormalizedY diff) noexcept
 	{
+
 		const auto range = peak - threashold;
 		const auto scaled_range = peak + diff - threashold;
 		const auto scale = scaled_range / range;

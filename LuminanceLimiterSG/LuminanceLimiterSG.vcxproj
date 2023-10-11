@@ -168,6 +168,7 @@
   <ItemGroup>
     <ClInclude Include="src\limiter.h" />
     <ClInclude Include="src\luminance_limiter_sg.h" />
+    <ClInclude Include="src\ruck_unit.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\luminance_limiter_sg.def" />

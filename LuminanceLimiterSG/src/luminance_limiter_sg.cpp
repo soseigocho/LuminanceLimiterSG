@@ -7,8 +7,7 @@
 
 
 #include "luminance_limiter_sg.h"
-#include "limiter.h"
-#include "peak_envelope_generator.h"
+#include "ruck_unit.h"
 
 #include <array>
 #include <functional>
@@ -20,16 +19,16 @@
 
 namespace luminance_limiter_sg {
 	constexpr static inline auto name = "LuminanceLimiterSG";
-	constexpr static inline auto track_n = 10u;
+	constexpr static inline auto track_n = 11u;
 	constexpr static inline auto track_name =
-		std::array<const char*, track_n>{ "ãŒÀ", "ãŒÀè‡’l", "‰ºŒÀ", "‰ºŒÀè‡’l", "•âŠÔÓ°ÄŞ", "‘±", "—]‰C", "µÌ¾¯Ä", "–¾‚é‚³", "ˆÃ‚³"};
-	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 4096, -1024, 256, 512, 0, 4, 8, -128, 512, -64 };
-	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, -4096, 0, 0, 0, 0, 0, -4096, -4096, -4096 };
-	constexpr static inline auto track_e = std::array<int32_t, track_n>{ 4096, 0, 4096, 4096, 2, 256, 256, 4096, 4096, 4096 };
+		std::array<const char*, track_n>{ "ID", "ãŒÀ", "ãŒÀè‡’l", "‰ºŒÀ", "‰ºŒÀè‡’l", "•âŠÔÓ°ÄŞ", "‘±", "—]‰C", "µÌ¾¯Ä", "–¾‚é‚³", "ˆÃ‚³"};
+	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 0, 4096, -1024, 256, 512, 0, 4, 8, -128, 512, -64 };
+	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, 0, -4096, 0, 0, 0, 0, 0, -4096, -4096, -4096 };
+	constexpr static inline auto track_e = std::array<int32_t, track_n>{ 128, 4096, 0, 4096, 4096, 2, 256, 256, 4096, 4096, 4096 };
 	constexpr static inline auto information = "LuminanceLimiterSG v0.2.0 by ‘e»ŒŞ’·";
 
-	constexpr static inline auto y_max = 4096.0f;
-	constexpr static inline auto y_min = 0.0f;
+	constexpr static inline auto y_max = 4096.0F;
+	constexpr static inline auto y_min = 0.0F;
 
 	template <typename T>
 	NormalizedY normalize_y(const T y) noexcept {
@@ -93,8 +92,31 @@ namespace luminance_limiter_sg {
 		return true;
 	}
 
-	static auto peak_envelope_generator = PeakEnvelopeGenerator();
-	static auto limiter = Limiter();
+	static std::unique_ptr<std::vector<std::unique_ptr<RuckUnit>>> effects_ruck;
+
+	const static inline bool check_and_fill_effects_ruck(const int32_t effects_id)
+	{
+		if (effects_ruck->size() < effects_id + 1)
+		{
+			for (auto i = effects_ruck->size(); i < effects_id + 1; i++)
+			{
+				effects_ruck->emplace_back(nullptr);
+			}
+		}
+
+		if (!(*effects_ruck)[effects_id])
+		{
+			(*effects_ruck)[effects_id].reset(new RuckUnit());
+			return false;
+		}
+
+		if (!static_cast<bool>((*effects_ruck)[effects_id]))
+		{
+			throw std::domain_error("the effects_ruck member has not been initialized.");
+		}
+
+		return true;
+	}
 
 	static inline BOOL func_proc(AviUtl::FilterPlugin* fp, AviUtl::FilterProcInfo* fpip)
 	{
@@ -102,40 +124,126 @@ namespace luminance_limiter_sg {
 
 		const auto orig_top = normalized_y_buffer.maximum();
 		const auto orig_bottom = normalized_y_buffer.minimum();
-		const auto top_diff = normalize_y(fp->track[8]);
-		const auto bottom_diff = normalize_y(fp->track[9]);
-		limiter.update_scale(orig_top, orig_bottom, top_diff, bottom_diff);
+		const auto top_diff = normalize_y(fp->track[9]);
+		const auto bottom_diff = normalize_y(fp->track[10]);
+		if (!effects_ruck)
+		{
+			throw std::domain_error("effects_ruck has not been initialized.");
+		}
 
-		const auto gain_val = normalize_y(fp->track[7]);
-		limiter.update_gain(gain_val);
+		const auto effects_id = static_cast<int32_t>(fp->track[0]);
+		if (!check_and_fill_effects_ruck(effects_id))
+		{
+			const auto top_limit = normalize_y(fp->track[1]);
+			const auto bottom_limit = normalize_y(fp->track[3]);
+			((*effects_ruck)[effects_id])->peak_envelope_generator.set_limit(top_limit, bottom_limit);
 
-		const auto top_limit = normalize_y(fp->track[0]);
-		const auto top_threshold_diff = normalize_y(fp->track[1]);
-		const auto bottom_limit = normalize_y(fp->track[2]);
-		const auto bottom_threshold_diff = normalize_y(fp->track[3]);
-		peak_envelope_generator.set_limit(top_limit, bottom_limit);
+			const auto sustain = static_cast<uint32_t>(fp->track[6]);
+			((*effects_ruck)[effects_id])->peak_envelope_generator.set_sustain(sustain);
 
-		const auto sustain = static_cast<uint32_t>(fp->track[5]);
-		peak_envelope_generator.set_sustain(sustain);
-		const auto release = static_cast<uint32_t>(fp->track[6]);
-		peak_envelope_generator.set_release(release);
+			const auto release = static_cast<uint32_t>(fp->track[7]);
+			((*effects_ruck)[effects_id])->peak_envelope_generator.set_release(release);
 
-		const auto gained_top = limiter.scale_and_gain(orig_top);
-		const auto gained_bottom = limiter.scale_and_gain(orig_bottom);
+			const auto gain_val = normalize_y(fp->track[8]);
+			((*effects_ruck)[effects_id])->limiter.update_gain(gain_val);
+		}
+
+		((*effects_ruck)[effects_id])->limiter.update_scale(orig_top, orig_bottom, top_diff, bottom_diff);
+
+		const auto top_limit = normalize_y(fp->track[1]);
+		const auto top_threshold_diff = normalize_y(fp->track[2]);
+		const auto bottom_limit = normalize_y(fp->track[3]);
+		const auto bottom_threshold_diff = normalize_y(fp->track[4]);
+
+		const auto gained_top = ((*effects_ruck)[effects_id])->limiter.scale_and_gain(orig_top);
+		const auto gained_bottom = ((*effects_ruck)[effects_id])->limiter.scale_and_gain(orig_bottom);
 		const auto [enveloped_top, enveloped_bottom] =
-			peak_envelope_generator.update_and_get_envelope_peaks(gained_top, gained_bottom);
+			((*effects_ruck)[effects_id])->peak_envelope_generator.update_and_get_envelope_peaks(gained_top, gained_bottom);
 
-		const auto limit_character_interpolation_mode = static_cast<InterpolationMode>(fp->track[4]);
-		limiter.update_limiter(
+		const auto limit_character_interpolation_mode = static_cast<InterpolationMode>(fp->track[5]);
+		((*effects_ruck)[effects_id])->limiter.update_limiter(
 			top_limit, top_threshold_diff,
 			bottom_limit, bottom_threshold_diff,
 			enveloped_top, enveloped_bottom,
 			limit_character_interpolation_mode);
 
-		normalized_y_buffer.pixelwise_map([](const NormalizedY y) -> NormalizedY { return limiter.limit(limiter.scale_and_gain(y)); });
+		normalized_y_buffer.pixelwise_map(
+			[=](const NormalizedY y) -> NormalizedY
+			{ return ((*effects_ruck)[effects_id])->limiter.limit(((*effects_ruck)[effects_id])->limiter.scale_and_gain(y)); });
 
 		normalized_y_buffer.render(fpip);
 
+		return true;
+	}
+
+	static inline BOOL func_init(AviUtl::FilterPlugin* fp)
+	{
+		effects_ruck = std::make_unique<std::vector<std::unique_ptr<RuckUnit>>>();
+		return static_cast<bool>(effects_ruck);
+	}
+
+	static inline BOOL func_update(AviUtl::FilterPlugin* fp, AviUtl::FilterPluginDLL::UpdateStatus status)
+	{
+		if (AviUtl::detail::FilterPluginUpdateStatus::Track <= status &&
+			status < AviUtl::detail::FilterPluginUpdateStatus::Check)
+		{
+			const auto track =
+				static_cast<std::underlying_type<AviUtl::FilterPluginDLL::UpdateStatus>::type>(status)
+				- static_cast<std::underlying_type<AviUtl::detail::FilterPluginUpdateStatus>::type>(AviUtl::detail::FilterPluginUpdateStatus::Track);
+			switch (track)
+			{
+			case 1U:
+			{
+				const auto effects_id = static_cast<int32_t>(fp->track[0]);
+				check_and_fill_effects_ruck(effects_id);
+				break;
+			}
+			case 2U:
+			{
+				const auto effects_id = static_cast<int32_t>(fp->track[0]);
+				check_and_fill_effects_ruck(effects_id);
+				const auto top_limit = normalize_y(fp->track[1]);
+				const auto bottom_limit = normalize_y(fp->track[3]);
+				((*effects_ruck)[effects_id])->peak_envelope_generator.set_limit(top_limit, bottom_limit);
+				break;
+			}
+			case 4U:
+			{
+				const auto effects_id = static_cast<int32_t>(fp->track[0]);
+				check_and_fill_effects_ruck(effects_id);
+				const auto top_limit = normalize_y(fp->track[1]);
+				const auto bottom_limit = normalize_y(fp->track[3]);
+				((*effects_ruck)[effects_id])->peak_envelope_generator.set_limit(top_limit, bottom_limit);
+				break;
+			}
+			case 7U:
+			{
+				const auto effects_id = static_cast<int32_t>(fp->track[0]);
+				check_and_fill_effects_ruck(effects_id);
+				const auto sustain = static_cast<uint32_t>(fp->track[6]);
+				((*effects_ruck)[effects_id])->peak_envelope_generator.set_sustain(sustain);
+				break;
+			}
+			case 8U:
+			{
+				const auto effects_id = static_cast<int32_t>(fp->track[0]);
+				check_and_fill_effects_ruck(effects_id);
+				const auto release = static_cast<uint32_t>(fp->track[7]);
+				((*effects_ruck)[effects_id])->peak_envelope_generator.set_release(release);
+				break;
+			}
+			case 9U:
+			{
+				const auto effects_id = static_cast<int32_t>(fp->track[0]);
+				check_and_fill_effects_ruck(effects_id);
+				const auto gain_val = normalize_y(fp->track[8]);
+				((*effects_ruck)[effects_id])->limiter.update_gain(gain_val);
+				break;
+			}
+			default:
+				break;
+			}
+		}
 		return true;
 	}
 }
@@ -150,6 +258,8 @@ constexpr AviUtl::FilterPluginDLL filter{
 	.track_s = const_cast<int32_t*>(std::data(luminance_limiter_sg::track_s)),
 	.track_e = const_cast<int32_t*>(std::data(luminance_limiter_sg::track_e)),
 	.func_proc = &luminance_limiter_sg::func_proc,
+	.func_init = &luminance_limiter_sg::func_init,
+	.func_update = &luminance_limiter_sg::func_update,
 	.information = luminance_limiter_sg::information,
 };
 
