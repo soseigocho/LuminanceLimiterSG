@@ -24,7 +24,7 @@ namespace luminance_limiter_sg {
 		const NormalizedY top_diff, const NormalizedY bottom_diff) noexcept;
 	const inline std::function<NormalizedY(NormalizedY)> make_gain(const NormalizedY gain) noexcept;
 
-	enum class InterpolationMode
+	enum class InterpolationMode : int32_t
 	{
 		Linear,
 		Lagrange,
@@ -148,8 +148,8 @@ namespace luminance_limiter_sg {
 		NormalizedY scale_and_gain(const NormalizedY y) const;
 		NormalizedY limit(const NormalizedY y) const;
 	private:
-		std::function<float(float)> scale;
-		std::function<float(float)> gain;
-		std::function<NormalizedY(NormalizedY)> limiter;
+		std::function<float(float)> scale = id;
+		std::function<float(float)> gain = id;
+		std::function<NormalizedY(NormalizedY)> limiter = id;
 	};
 }

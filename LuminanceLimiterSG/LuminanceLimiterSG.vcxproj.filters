@@ -32,6 +32,9 @@
     <ClInclude Include="src\limiter.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="src\ruck_unit.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\luminance_limiter_sg.def">
