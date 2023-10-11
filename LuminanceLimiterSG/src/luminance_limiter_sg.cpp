@@ -24,7 +24,8 @@ namespace luminance_limiter_sg {
 		std::array<const char*, track_n>{ "ID", "ãŒÀ", "ãŒÀè‡’l", "‰ºŒÀ", "‰ºŒÀè‡’l", "•âŠÔÓ°ÄŞ", "‘±", "—]‰C", "µÌ¾¯Ä", "–¾‚é‚³", "ˆÃ‚³"};
 	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 0, 4096, -1024, 256, 512, 0, 4, 8, -128, 512, -64 };
 	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, 0, -4096, 0, 0, 0, 0, 0, -4096, -4096, -4096 };
-	constexpr static inline auto track_e = std::array<int32_t, track_n>{ 128, 4096, 0, 4096, 4096, 2, 256, 256, 4096, 4096, 4096 };
+	constexpr static inline auto num_or_rucks = 16UL;
+	constexpr static inline auto track_e = std::array<int32_t, track_n>{ num_or_rucks, 4096, 0, 4096, 4096, 2, 256, 256, 4096, 4096, 4096 };
 	constexpr static inline auto information = "LuminanceLimiterSG v0.2.0 by ‘e»ŒŞ’·";
 
 	constexpr static inline auto y_max = 4096.0F;
@@ -92,16 +93,14 @@ namespace luminance_limiter_sg {
 		return true;
 	}
 
-	static std::unique_ptr<std::vector<std::unique_ptr<RuckUnit>>> effects_ruck;
+	static std::unique_ptr<std::array<std::unique_ptr<RuckUnit>, num_or_rucks>> effects_ruck;
+	static auto current_frame = 0UL;
 
 	const static inline bool check_and_fill_effects_ruck(const int32_t effects_id)
 	{
 		if (effects_ruck->size() < effects_id + 1)
 		{
-			for (auto i = effects_ruck->size(); i < effects_id + 1; i++)
-			{
-				effects_ruck->emplace_back(nullptr);
-			}
+			throw std::out_of_range("the effects_ruck has smaller elements than the input.");
 		}
 
 		if (!(*effects_ruck)[effects_id])
@@ -131,7 +130,26 @@ namespace luminance_limiter_sg {
 			throw std::domain_error("effects_ruck has not been initialized.");
 		}
 
-		const auto effects_id = static_cast<int32_t>(fp->track[0]);
+		if (current_frame < fpip->frame)
+		{
+			for (auto&& elem : (*effects_ruck))
+			{
+				if (elem)
+				{
+					if (elem->used)
+					{
+						elem.reset(nullptr);
+					}
+					else
+					{
+						elem->used = false;
+					}
+				}
+			}
+			current_frame = fpip->frame;
+		}
+
+		const auto effects_id = static_cast<uint32_t>(fp->track[0]);
 		if (!check_and_fill_effects_ruck(effects_id))
 		{
 			const auto top_limit = normalize_y(fp->track[1]);
@@ -147,6 +165,8 @@ namespace luminance_limiter_sg {
 			const auto gain_val = normalize_y(fp->track[8]);
 			((*effects_ruck)[effects_id])->limiter.update_gain(gain_val);
 		}
+
+		(*effects_ruck)[effects_id]->used = true;
 
 		((*effects_ruck)[effects_id])->limiter.update_scale(orig_top, orig_bottom, top_diff, bottom_diff);
 
@@ -178,7 +198,7 @@ namespace luminance_limiter_sg {
 
 	static inline BOOL func_init(AviUtl::FilterPlugin* fp)
 	{
-		effects_ruck = std::make_unique<std::vector<std::unique_ptr<RuckUnit>>>();
+		effects_ruck = std::make_unique<std::array<std::unique_ptr<RuckUnit>, num_or_rucks>>();
 		return static_cast<bool>(effects_ruck);
 	}
 
@@ -190,18 +210,18 @@ namespace luminance_limiter_sg {
 			const auto track =
 				static_cast<std::underlying_type<AviUtl::FilterPluginDLL::UpdateStatus>::type>(status)
 				- static_cast<std::underlying_type<AviUtl::detail::FilterPluginUpdateStatus>::type>(AviUtl::detail::FilterPluginUpdateStatus::Track);
+
+			const auto effects_id = static_cast<uint32_t>(fp->track[0]);
+			check_and_fill_effects_ruck(effects_id);
+
 			switch (track)
 			{
 			case 1U:
 			{
-				const auto effects_id = static_cast<int32_t>(fp->track[0]);
-				check_and_fill_effects_ruck(effects_id);
 				break;
 			}
 			case 2U:
 			{
-				const auto effects_id = static_cast<int32_t>(fp->track[0]);
-				check_and_fill_effects_ruck(effects_id);
 				const auto top_limit = normalize_y(fp->track[1]);
 				const auto bottom_limit = normalize_y(fp->track[3]);
 				((*effects_ruck)[effects_id])->peak_envelope_generator.set_limit(top_limit, bottom_limit);
@@ -209,8 +229,6 @@ namespace luminance_limiter_sg {
 			}
 			case 4U:
 			{
-				const auto effects_id = static_cast<int32_t>(fp->track[0]);
-				check_and_fill_effects_ruck(effects_id);
 				const auto top_limit = normalize_y(fp->track[1]);
 				const auto bottom_limit = normalize_y(fp->track[3]);
 				((*effects_ruck)[effects_id])->peak_envelope_generator.set_limit(top_limit, bottom_limit);
@@ -218,24 +236,18 @@ namespace luminance_limiter_sg {
 			}
 			case 7U:
 			{
-				const auto effects_id = static_cast<int32_t>(fp->track[0]);
-				check_and_fill_effects_ruck(effects_id);
 				const auto sustain = static_cast<uint32_t>(fp->track[6]);
 				((*effects_ruck)[effects_id])->peak_envelope_generator.set_sustain(sustain);
 				break;
 			}
 			case 8U:
 			{
-				const auto effects_id = static_cast<int32_t>(fp->track[0]);
-				check_and_fill_effects_ruck(effects_id);
 				const auto release = static_cast<uint32_t>(fp->track[7]);
 				((*effects_ruck)[effects_id])->peak_envelope_generator.set_release(release);
 				break;
 			}
 			case 9U:
 			{
-				const auto effects_id = static_cast<int32_t>(fp->track[0]);
-				check_and_fill_effects_ruck(effects_id);
 				const auto gain_val = normalize_y(fp->track[8]);
 				((*effects_ruck)[effects_id])->limiter.update_gain(gain_val);
 				break;
