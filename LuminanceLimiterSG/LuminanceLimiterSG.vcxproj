@@ -159,11 +159,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\limiter.cpp" />
     <ClCompile Include="src\luminance_limiter_sg.cpp" />
+    <ClCompile Include="src\peak_envelope_generator.cpp" />
+    <ClCompile Include="src\peak_envelope_generator.h" />
     <ClCompile Include="test\luminance_limiter_sg_test.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\limiter.h" />
     <ClInclude Include="src\luminance_limiter_sg.h" />
+    <ClInclude Include="src\ruck_unit.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\luminance_limiter_sg.def" />

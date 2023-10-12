@@ -15,9 +15,24 @@
     <ClCompile Include="src\luminance_limiter_sg.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\peak_envelope_generator.h">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\peak_envelope_generator.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\limiter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\luminance_limiter_sg.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\limiter.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ruck_unit.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

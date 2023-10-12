@@ -7,27 +7,29 @@
 
 
 #include "luminance_limiter_sg.h"
+#include "ruck_unit.h"
 
 #include <array>
-#include <deque>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 
 
 namespace luminance_limiter_sg {
 	constexpr static inline auto name = "LuminanceLimiterSG";
-	constexpr static inline auto track_n = 10u;
+	constexpr static inline auto track_n = 11u;
 	constexpr static inline auto track_name =
-		std::array<const char*, track_n>{ "è„å¿", "è„å¿Ëáíl", "â∫å¿", "â∫å¿Ëáíl", "ï‚ä‘”∞ƒﬁ", "éùë±", "ó]âC", "µÃæØƒ", "ñæÇÈÇ≥", "à√Ç≥"};
-	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 4096, -1024, 256, 512, 0, 4, 8, -128, 512, -64 };
-	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, -4096, 0, 0, 0, 0, 0, -4096, -4096, -4096 };
-	constexpr static inline auto track_e = std::array<int32_t, track_n>{ 4096, 0, 4096, 4096, 2, 256, 256, 4096, 4096, 4096 };
+		std::array<const char*, track_n>{ "ID", "è„å¿", "è„å¿Ëáíl", "â∫å¿", "â∫å¿Ëáíl", "ï‚ä‘”∞ƒﬁ", "éùë±", "ó]âC", "µÃæØƒ", "ñæÇÈÇ≥", "à√Ç≥"};
+	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 0, 4096, -1024, 256, 512, 0, 4, 8, -128, 512, -64 };
+	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, 0, -4096, 0, 0, 0, 0, 0, -4096, -4096, -4096 };
+	constexpr static inline auto num_or_rucks = 16UL;
+	constexpr static inline auto track_e = std::array<int32_t, track_n>{ num_or_rucks, 4096, 0, 4096, 4096, 2, 256, 256, 4096, 4096, 4096 };
 	constexpr static inline auto information = "LuminanceLimiterSG v0.2.0 by ëeêªåﬁí∑";
 
-	constexpr static inline auto y_max = 4096.0f;
-	constexpr static inline auto y_min = 0.0f;
+	constexpr static inline auto y_max = 4096.0F;
+	constexpr static inline auto y_min = 0.0F;
 
 	template <typename T>
 	NormalizedY normalize_y(const T y) noexcept {
@@ -91,596 +93,29 @@ namespace luminance_limiter_sg {
 		return true;
 	}
 
-	constexpr static inline auto stretch_scale(const NormalizedY peak, const NormalizedY threashold, const NormalizedY diff) noexcept
+	static std::unique_ptr<std::array<std::unique_ptr<RuckUnit>, num_or_rucks>> effects_ruck;
+	static auto current_frame = 0UL;
+
+	const static inline bool check_and_fill_effects_ruck(const int32_t effects_id)
 	{
-		const auto range = peak - threashold;
-		const auto scaled_range = peak + diff - threashold;
-		const auto scale = scaled_range / range;
-		return scale;
+		if (effects_ruck->size() < effects_id + 1)
+		{
+			throw std::out_of_range("the effects_ruck has smaller elements than the input.");
+		}
+
+		if (!(*effects_ruck)[effects_id])
+		{
+			(*effects_ruck)[effects_id].reset(new RuckUnit());
+			return false;
+		}
+
+		if (!static_cast<bool>((*effects_ruck)[effects_id]))
+		{
+			throw std::domain_error("the effects_ruck member has not been initialized.");
+		}
+
+		return true;
 	}
-
-	constexpr static inline auto stretch_diff(const NormalizedY threashold, const NormalizedY scale, const NormalizedY y) noexcept
-	{
-		const auto stretching_range = y - threashold;
-		const auto stretched_range = stretching_range * scale;
-		const auto stretched = stretched_range + threashold;
-		const auto diff = stretched - y;
-		return diff;
-	}
-
-	constexpr static inline auto make_scale(
-		const NormalizedY orig_top, const NormalizedY orig_bottom,
-		const NormalizedY top_diff, const NormalizedY bottom_diff) noexcept
-	{
-		const auto top_scale = stretch_scale(orig_top, orig_bottom, top_diff);
-		const auto bottom_scale = stretch_scale(orig_bottom, orig_top, bottom_diff);
-
-		return [=](NormalizedY y) -> NormalizedY {
-			const auto upper_y_diff = stretch_diff(orig_bottom, top_scale, y);
-			const auto lower_y_diff = stretch_diff(orig_top, bottom_scale, y);
-			return y + upper_y_diff + lower_y_diff;
-		};
-	}
-
-	constexpr static inline auto make_gain(const NormalizedY gain) noexcept
-	{
-		return [=](NormalizedY y) {return y + gain; };
-	}
-
-	enum class interpolationMode
-	{
-		Linear,
-		Lagrange,
-		Spline
-	};
-
-	constexpr static inline auto linear_interp(const std::vector<float>&& xs, const std::vector<float>&& ys)
-	{
-		if (xs.size() != ys.size())
-		{
-			throw std::runtime_error("Error: xs and ys must have the same size.");
-		}
-
-		if (xs.size() < 2)
-		{
-			throw std::runtime_error("Error: xs and ys must have at least 2 elements.");
-		}
-
-		auto n = xs.size();
-		std::vector<float> slopes(n - 1);
-		for (auto i = 0; i < n - 1; ++i)
-		{
-			slopes[i] = (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]);
-		}
-
-		return [=](float x) -> float {
-			if (x < xs[0] || x > xs[n - 1])
-			{
-				throw std::range_error("Error: x is out of range.");
-			}
-
-			auto left = 0;
-			auto right = n - 1;
-			while (left + 1 < right)
-			{
-				const auto mid = (left + right) / 2;
-				if (xs[mid] <= x)
-				{
-					left = mid;
-				}
-				else
-				{
-					right = mid;
-				}
-			}
-
-			const auto idx = left;
-			return ys[idx] + slopes[idx] * (x - xs[idx]);
-		};
-	}
-
-	constexpr static inline auto lagrange_interp(const std::vector<float>&& xs, const std::vector<float>&& ys)
-	{
-		if (xs.size() != ys.size())
-		{
-			throw std::runtime_error("Error: xs and ys must have the same size.");
-		}
-
-		if (xs.size() < 2)
-		{
-			throw std::runtime_error("Error: xs and ys must have at least 2 elements.");
-		}
-
-		return [=](float x) {
-			auto sum = 0.0f;
-			for (auto i = 0; i < xs.size(); ++i)
-			{
-				auto prod = 1.0f;
-				for (auto j = 0; j < xs.size(); ++j)
-				{
-					if (i != j)
-					{
-						prod *= (x - xs[j]) / (xs[i] - xs[j]);
-					}
-				}
-				sum += ys[i] * prod;
-			}
-			return sum;
-		};
-	}
-
-	constexpr static inline auto tdma(const std::vector<float>& a, const std::vector<float>& b, const std::vector<float>& c, const std::vector<float>& d)
-	{
-		auto n = a.size() - 1;
-		auto p = std::vector<float>(a.size());
-		auto q = std::vector<float>(a.size());
-
-		p[0] = -b[0] / a[0];
-		q[0] = d[0] / a[0];
-
-		for (auto i = 1; i < a.size(); i++)
-		{
-			p[i] = -b[i] / (a[i] + c[i] * p[i - 1]);
-			q[i] = (d[i] - c[i] * q[i - 1]) / (a[i] + c[i] * p[i - 1]);
-		}
-
-		auto x = std::vector<float>(a.size());
-		x[n] = q[n];
-		for (auto i = n - 1; i > -1; i--)
-		{
-			x[i] = p[i] * x[i + 1] + q[i];
-		}
-
-		return x;
-	}
-
-	constexpr static inline std::optional<int> inner_binary_search(const std::vector<float>& xs, const float x, const int max_idx, const int min_idx)
-	{
-		if (max_idx < min_idx)
-		{
-			return std::nullopt;
-		}
-
-		auto mid_idx = min_idx + (max_idx - min_idx) / 2;
-		if (xs[mid_idx] > x)
-		{
-			return inner_binary_search(xs, x, min_idx, mid_idx - 1);
-		}
-		else if (xs[mid_idx] < x)
-		{
-			return inner_binary_search(xs, x, mid_idx + 1, max_idx);
-		}
-		else
-		{
-			return mid_idx;
-		}
-	}
-
-	constexpr static inline auto binary_search(const std::vector<float>& xs, const float x)
-	{
-		return inner_binary_search(xs, x, 0, xs.size() - 1);
-	}
-
-	constexpr static inline auto spline_interp(const std::vector<float>&& xs, const std::vector<float>&& ys)
-	{
-		if (xs.size() != ys.size())
-		{
-			throw std::runtime_error("Error: xs and ys must have the same size.");
-		}
-
-		if (xs.size() < 2)
-		{
-			throw std::runtime_error("Error: xs and ys must have at least 2 elements.");
-		}
-
-		const auto n = xs.size() - 1;
-
-		auto as = std::vector<float>(xs.size());
-		for (auto i = 0; i < xs.size(); i++)
-		{
-			as[i] = ys[i];
-		}
-
-		auto hs = std::vector<float>(n);
-		for (auto i = 0; i < n; i++)
-		{
-			hs[i] = xs[i + 1] - xs[i];
-		}
-
-		auto aas = std::vector<float>(xs.size());
-		for (auto i = 0; i < xs.size(); i++)
-		{
-			if (i == 0)
-			{
-				aas[i] = 1;
-			}
-			else if (i == n)
-			{
-				aas[i] = 0;
-			}
-			else
-			{
-				aas[i] = 2 * (hs[i - 1] + hs[i]);
-			}
-		}
-
-		auto abs = std::vector<float>(xs.size());
-		for (auto i = 0; i < xs.size(); i++)
-		{
-			if (i == 0)
-			{
-				abs[i] = 0;
-			}
-			else if (i == n)
-			{
-				abs[i] = 1;
-			}
-			else
-			{
-				abs[i] = hs[i];
-			}
-		}
-
-		auto acs = std::vector<float>(xs.size());
-		for (auto i = 0; i < xs.size(); i++)
-		{
-			if (i == 0)
-			{
-				acs[i] = 0;
-			}
-			else
-			{
-				acs[i] = hs[i - 1];
-			}
-		}
-
-		auto prod_b = std::vector<float>(xs.size());
-		for (auto i = 0; i < xs.size(); i++)
-		{
-			if (i == 0 || i == n)
-			{
-				prod_b[i] = 0;
-			}
-			else
-			{
-				prod_b[i] = 3 * ((as[i + 1] - as[i]) / hs[i] - (as[i] - as[i - 1]) / hs[i-1]);
-			}
-		}
-
-		auto cs = tdma(aas, abs, acs, prod_b);
-
-		auto bs = std::vector<float>(xs.size());
-		auto ds = std::vector<float>(xs.size());
-		for (auto i = 0; i <= n; i++)
-		{
-			if (i == n)
-			{
-				bs[i] = 0.0;
-				ds[i] = 0.0;
-			}
-			else
-			{
-				bs[i] = (as[i + 1] - as[i]) / hs[i] - hs[i] * (cs[i + 1] + 2 * cs[i]) / 3;
-				ds[i] = (cs[i + 1] - cs[i]) / (3.0 * hs[i]);
-			}
-		}
-
-		return [=](float x) {
-			auto opt_i = binary_search(xs, x);
-
-			auto i = opt_i.value_or((x > xs[0]) ? 0 : (xs.size() - 1));
-
-			auto dt = x - xs[i];
-			return as[i] + (bs[i] + (cs[i] + ds[i] * dt) * dt) * dt;
-			};
-	}
-
-	template<typename F>
-	constexpr static inline auto make_some_charactors(
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
-		const NormalizedY top_peak, const NormalizedY bottom_peak,
-		F interp_method)
-	{
-		const auto top_threshold = top_limit + top_threshold_diff;
-		const auto bottom_threshold = bottom_limit + bottom_threshold_diff;
-		const auto x0 = bottom_peak <= bottom_limit ? bottom_peak : bottom_limit;
-		const auto x3 = top_peak >= top_limit ? top_peak : top_limit;
-		auto xs = std::vector{ x0, bottom_threshold, top_threshold, x3 };
-		std::sort(xs.begin(), xs.end());
-		auto ys = std::vector{ bottom_limit, bottom_threshold, top_threshold, top_limit };
-		std::sort(ys.begin(), ys.end());
-		return interp_method(std::move(xs), std::move(ys));
-	}
-
-	constexpr static inline auto make_linear_character = [](
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
-		const NormalizedY top_peak, const NormalizedY bottom_peak)
-		{
-			return make_some_charactors(
-				top_limit, top_threshold_diff,
-				bottom_limit, bottom_threshold_diff,
-				top_peak, bottom_peak,
-				linear_interp);
-		};
-
-	constexpr static inline auto make_lagrange_character = [](
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
-		const NormalizedY top_peak, const NormalizedY bottom_peak)
-		{
-			return make_some_charactors(
-				top_limit, top_threshold_diff,
-				bottom_limit, bottom_threshold_diff,
-				top_peak, bottom_peak,
-				lagrange_interp);
-		};
-
-	constexpr static inline auto make_spline_character = [](
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
-		const NormalizedY top_peak, const NormalizedY bottom_peak)
-		{
-			return make_some_charactors(
-				top_limit, top_threshold_diff,
-				bottom_limit, bottom_threshold_diff,
-				top_peak, bottom_peak,
-				spline_interp);
-		};
-
-	const static inline std::function<
-		std::function<float(float)>(
-			NormalizedY, NormalizedY,
-			NormalizedY, NormalizedY,
-			NormalizedY, NormalizedY)> select_character(interpolationMode mode)
-	{
-		switch (mode)
-		{
-		case interpolationMode::Linear:
-			return make_linear_character;
-		case interpolationMode::Lagrange:
-			return make_lagrange_character;
-		case interpolationMode::Spline:
-			return make_spline_character;
-		default:
-			throw std::runtime_error("Error: Illegal interpolation mode.");
-		}
-	}
-
-	template<typename F>
-	const static inline std::function<float(float)> make_character(
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
-		const NormalizedY top_peak, const NormalizedY bottom_peak,
-		F character)
-	{
-		return character(top_limit, top_threshold_diff, bottom_limit, bottom_threshold_diff, top_peak, bottom_peak);
-	}
-
-	template <typename F>
-	constexpr static inline auto make_limit(
-		const F& character,
-		const NormalizedY top_limit,
-		const NormalizedY bottom_limit)
-	{
-		return [=, &character](const NormalizedY y) -> NormalizedY {
-			const auto charactered = character(y);
-			if (charactered > top_limit)
-			{
-				return top_limit;
-			}
-			else if (charactered < bottom_limit)
-			{
-				return bottom_limit;
-			}
-			else
-			{
-				return charactered;
-			}
-		};
-	}
-
-	class PeakEnvelopeGenerator {
-	public:
-		BOOL set_limit(const NormalizedY top, const NormalizedY bottom) noexcept {
-			top_limit = top;
-			bottom_limit = bottom;
-			return true;
-		}
-
-		BOOL set_sustain(const uint32_t sustain) {
-			this->sustain = sustain;
-
-			if (sustain == 0)
-			{
-				this->top_peak_lifetime_buffer = std::nullopt;
-				this->bottom_peak_lifetime_buffer = std::nullopt;
-				this->active_top_peak_buffer = std::nullopt;
-				this->active_bottom_peak_buffer = std::nullopt;
-				return false;
-			}
-
-			if (!top_peak_lifetime_buffer.has_value() || !active_top_peak_buffer.has_value()
-				|| !bottom_peak_lifetime_buffer.has_value() || !active_bottom_peak_buffer.has_value())
-			{
-				this->top_peak_lifetime_buffer =
-					std::make_optional<std::deque<NormalizedY>>(sustain + 1, -std::numeric_limits<NormalizedY>::infinity());
-				this->active_top_peak_buffer = std::make_optional<std::deque<NormalizedY>>();
-				this->bottom_peak_lifetime_buffer =
-					std::make_optional<std::deque<NormalizedY>>(sustain + 1, std::numeric_limits<NormalizedY>::infinity());
-				this->active_bottom_peak_buffer = std::make_optional<std::deque<NormalizedY>>();
-
-				return true;
-			}
-
-			if (top_peak_lifetime_buffer.value().size() == (sustain + 1)
-				&& bottom_peak_lifetime_buffer.value().size() == (sustain + 1))
-			{
-				return true;
-			}
-
-			if (top_peak_lifetime_buffer.value().size() > (sustain + 1))
-			{
-				top_peak_lifetime_buffer.value().erase(
-					top_peak_lifetime_buffer.value().begin(),
-					top_peak_lifetime_buffer.value().begin()
-					+ (top_peak_lifetime_buffer.value().size() - (sustain + 1)));
-			}
-
-			if (bottom_peak_lifetime_buffer.value().size() > (sustain + 1))
-			{
-				bottom_peak_lifetime_buffer.value().erase(
-					bottom_peak_lifetime_buffer.value().begin(),
-					bottom_peak_lifetime_buffer.value().begin()
-					+ (bottom_peak_lifetime_buffer.value().size() - (sustain + 1)));
-			}
-
-			if (top_peak_lifetime_buffer.value().size() < (sustain + 1))
-			{
-				const auto top_shrink_size = sustain + 1 - top_peak_lifetime_buffer.value().size();
-				for (auto i = 0; i < top_shrink_size; i++)
-				{
-					top_peak_lifetime_buffer.value().push_front(0.0f);
-				}
-			}
-
-			if (bottom_peak_lifetime_buffer.value().size() < (sustain + 1))
-			{
-				const auto bottom_shrink_size = sustain + 1 - bottom_peak_lifetime_buffer.value().size();
-				for (auto i = 0; i < bottom_shrink_size; i++)
-				{
-					bottom_peak_lifetime_buffer.value().push_front(0.0f);
-				}
-			}
-
-			return true;
-		}
-
-		BOOL set_release(const uint32_t release)
-		{
-			this->release = release;
-			return true;
-		}
-
-		std::array<NormalizedY, 2> hold_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept {
-			if (!top_peak_lifetime_buffer.has_value() || !active_top_peak_buffer.has_value()
-				|| !bottom_peak_lifetime_buffer.has_value() || !active_bottom_peak_buffer.has_value())
-			{
-				return { top_peak, bottom_peak };
-			}
-
-			while (!active_top_peak_buffer.value().empty()
-				&& active_top_peak_buffer.value().back() < top_peak)
-			{
-				active_top_peak_buffer.value().pop_back();
-			}
-
-			while (!active_bottom_peak_buffer.value().empty()
-				&& active_bottom_peak_buffer.value().back() > bottom_peak)
-			{
-				active_bottom_peak_buffer.value().pop_back();
-			}
-
-			active_top_peak_buffer.value().push_back(top_peak);
-			active_bottom_peak_buffer.value().push_back(bottom_peak);
-
-			top_peak_lifetime_buffer.value().push_back(top_peak);
-			const auto lifetimed_top_peak = top_peak_lifetime_buffer.value().front();
-			top_peak_lifetime_buffer.value().pop_front();
-			bottom_peak_lifetime_buffer.value().push_back(bottom_peak);
-			const auto lifetimed_bottom_peak = bottom_peak_lifetime_buffer.value().front();
-			bottom_peak_lifetime_buffer.value().pop_front();
-
-			if (active_top_peak_buffer.value().front() == lifetimed_top_peak)
-			{
-				active_top_peak_buffer.value().pop_front();
-			}
-			const auto current_top_peak = active_top_peak_buffer.value().empty() ? top_peak : active_top_peak_buffer.value().front();
-
-			if (active_bottom_peak_buffer.value().front() == lifetimed_bottom_peak)
-			{
-				active_bottom_peak_buffer.value().pop_front();
-			}
-			const auto current_bottom_peak = active_bottom_peak_buffer.value().empty() ? bottom_peak : active_bottom_peak_buffer.value().front();
-
-			return { current_top_peak, current_bottom_peak };
-		}
-
-		std::array<NormalizedY, 2> wrap_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept {
-			NormalizedY wraped_top;
-			if (ongoing_top_peak == top_peak)
-			{
-				wraped_top = top_peak;
-				top_peak_duration = 0u;
-			}
-			else
-			{
-				top_peak_duration++;
-				const auto coefficient = -(ongoing_top_peak - bottom_limit) / static_cast<float>(release);
-				const auto slice = ongoing_top_peak;
-				const auto released = coefficient * static_cast<float>(top_peak_duration) + slice;
-				if (top_peak >= released)
-				{
-					wraped_top = top_peak;
-					ongoing_top_peak = top_peak;
-					top_peak_duration = 0u;
-				}
-				else
-				{
-					wraped_top = released;
-				}
-			}
-
-			NormalizedY wraped_bottom;
-			if (ongoing_bottom_peak == bottom_peak)
-			{
-				wraped_bottom = bottom_peak;
-				bottom_peak_duration = 0u;
-			}
-			else
-			{
-				bottom_peak_duration++;
-				const auto coefficient = -(ongoing_bottom_peak - top_limit) / static_cast<float>(release);
-				const auto slice = ongoing_bottom_peak;
-				const auto released = coefficient * static_cast<float>(bottom_peak_duration) + slice;
-				if (bottom_peak <= released)
-				{
-					wraped_bottom = bottom_peak;
-					ongoing_bottom_peak = bottom_peak;
-					bottom_peak_duration = 0u;
-				}
-				else
-				{
-					wraped_bottom = released;
-				}
-			}
-			return { wraped_top, wraped_bottom };
-		}
-
-		std::array<NormalizedY, 2> update_and_get_envelope_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept {
-			const auto [current_top_peak, current_bottom_peak] = hold_peaks(top_peak, bottom_peak);
-			const auto [wrapped_top_peak, wrapped_bottom_peak] = wrap_peaks(current_top_peak, current_bottom_peak);
-			return { wrapped_top_peak, wrapped_bottom_peak };
-		};
-
-	private:
-		std::optional<std::deque<NormalizedY>> top_peak_lifetime_buffer = std::nullopt;
-		std::optional<std::deque<NormalizedY>> bottom_peak_lifetime_buffer = std::nullopt;
-		std::optional<std::deque<NormalizedY>> active_top_peak_buffer = std::nullopt;
-		std::optional<std::deque<NormalizedY>> active_bottom_peak_buffer = std::nullopt;
-		uint32_t sustain = 0u;
-		uint32_t release = 0u;
-		NormalizedY ongoing_top_peak = 0.0f;
-		uint32_t top_peak_duration = 0u;
-		NormalizedY ongoing_bottom_peak = 0.0f;
-		uint32_t bottom_peak_duration = 0u;
-
-		NormalizedY top_limit = 0.0f;
-		NormalizedY bottom_limit = 0.0f;
-	};
-
-	static auto peak_envelope_generator = PeakEnvelopeGenerator();
 
 	static inline BOOL func_proc(AviUtl::FilterPlugin* fp, AviUtl::FilterProcInfo* fpip)
 	{
@@ -688,45 +123,139 @@ namespace luminance_limiter_sg {
 
 		const auto orig_top = normalized_y_buffer.maximum();
 		const auto orig_bottom = normalized_y_buffer.minimum();
-		const auto top_diff = normalize_y(fp->track[8]);
-		const auto bottom_diff = normalize_y(fp->track[9]);
-		const auto scale = make_scale(orig_top, orig_bottom, top_diff, bottom_diff);
+		const auto top_diff = normalize_y(fp->track[9]);
+		const auto bottom_diff = normalize_y(fp->track[10]);
+		if (!effects_ruck)
+		{
+			throw std::domain_error("effects_ruck has not been initialized.");
+		}
 
-		const auto gain_val = normalize_y(fp->track[7]);
-		const auto gain = make_gain(gain_val);
+		if (current_frame < fpip->frame)
+		{
+			for (auto&& elem : (*effects_ruck))
+			{
+				if (elem)
+				{
+					if (elem->used)
+					{
+						elem.reset(nullptr);
+					}
+					else
+					{
+						elem->used = false;
+					}
+				}
+			}
+			current_frame = fpip->frame;
+		}
 
-		const auto scale_and_gain = [&](NormalizedY y) {return gain(scale(y)); };
+		const auto effects_id = static_cast<uint32_t>(fp->track[0]);
+		if (!check_and_fill_effects_ruck(effects_id))
+		{
+			const auto top_limit = normalize_y(fp->track[1]);
+			const auto bottom_limit = normalize_y(fp->track[3]);
+			((*effects_ruck)[effects_id])->peak_envelope_generator.set_limit(top_limit, bottom_limit);
 
-		const auto top_limit = normalize_y(fp->track[0]);
-		const auto top_threshold_diff = normalize_y(fp->track[1]);
-		const auto bottom_limit = normalize_y(fp->track[2]);
-		const auto bottom_threshold_diff = normalize_y(fp->track[3]);
-		peak_envelope_generator.set_limit(top_limit, bottom_limit);
+			const auto sustain = static_cast<uint32_t>(fp->track[6]);
+			((*effects_ruck)[effects_id])->peak_envelope_generator.set_sustain(sustain);
 
-		const auto sustain = static_cast<uint32_t>(fp->track[5]);
-		peak_envelope_generator.set_sustain(sustain);
-		const auto release = static_cast<uint32_t>(fp->track[6]);
-		peak_envelope_generator.set_release(release);
+			const auto release = static_cast<uint32_t>(fp->track[7]);
+			((*effects_ruck)[effects_id])->peak_envelope_generator.set_release(release);
 
-		const auto gained_top = scale_and_gain(orig_top);
-		const auto gained_bottom = scale_and_gain(orig_bottom);
+			const auto gain_val = normalize_y(fp->track[8]);
+			((*effects_ruck)[effects_id])->limiter.update_gain(gain_val);
+		}
+
+		(*effects_ruck)[effects_id]->used = true;
+
+		((*effects_ruck)[effects_id])->limiter.update_scale(orig_top, orig_bottom, top_diff, bottom_diff);
+
+		const auto top_limit = normalize_y(fp->track[1]);
+		const auto top_threshold_diff = normalize_y(fp->track[2]);
+		const auto bottom_limit = normalize_y(fp->track[3]);
+		const auto bottom_threshold_diff = normalize_y(fp->track[4]);
+
+		const auto gained_top = ((*effects_ruck)[effects_id])->limiter.scale_and_gain(orig_top);
+		const auto gained_bottom = ((*effects_ruck)[effects_id])->limiter.scale_and_gain(orig_bottom);
 		const auto [enveloped_top, enveloped_bottom] =
-			peak_envelope_generator.update_and_get_envelope_peaks(gained_top, gained_bottom);
+			((*effects_ruck)[effects_id])->peak_envelope_generator.update_and_get_envelope_peaks(gained_top, gained_bottom);
 
-		const auto limit_character_interpolation_mode = static_cast<interpolationMode>(fp->track[4]);
-		const auto character =
-			make_character(
-				top_limit, top_threshold_diff,
-				bottom_limit, bottom_threshold_diff,
-				gained_top, gained_bottom,
-				select_character(limit_character_interpolation_mode));
+		const auto limit_character_interpolation_mode = static_cast<InterpolationMode>(fp->track[5]);
+		((*effects_ruck)[effects_id])->limiter.update_limiter(
+			top_limit, top_threshold_diff,
+			bottom_limit, bottom_threshold_diff,
+			enveloped_top, enveloped_bottom,
+			limit_character_interpolation_mode);
 
-		const auto limit = make_limit(character, top_limit, bottom_limit);
-
-		normalized_y_buffer.pixelwise_map([&](NormalizedY y) -> NormalizedY {return limit(scale_and_gain(y)); });
+		normalized_y_buffer.pixelwise_map(
+			[=](const NormalizedY y) -> NormalizedY
+			{ return ((*effects_ruck)[effects_id])->limiter.limit(((*effects_ruck)[effects_id])->limiter.scale_and_gain(y)); });
 
 		normalized_y_buffer.render(fpip);
 
+		return true;
+	}
+
+	static inline BOOL func_init(AviUtl::FilterPlugin* fp)
+	{
+		effects_ruck = std::make_unique<std::array<std::unique_ptr<RuckUnit>, num_or_rucks>>();
+		return static_cast<bool>(effects_ruck);
+	}
+
+	static inline BOOL func_update(AviUtl::FilterPlugin* fp, AviUtl::FilterPluginDLL::UpdateStatus status)
+	{
+		if (AviUtl::detail::FilterPluginUpdateStatus::Track <= status &&
+			status < AviUtl::detail::FilterPluginUpdateStatus::Check)
+		{
+			const auto track =
+				static_cast<std::underlying_type<AviUtl::FilterPluginDLL::UpdateStatus>::type>(status)
+				- static_cast<std::underlying_type<AviUtl::detail::FilterPluginUpdateStatus>::type>(AviUtl::detail::FilterPluginUpdateStatus::Track);
+
+			const auto effects_id = static_cast<uint32_t>(fp->track[0]);
+			check_and_fill_effects_ruck(effects_id);
+
+			switch (track)
+			{
+			case 1U:
+			{
+				break;
+			}
+			case 2U:
+			{
+				const auto top_limit = normalize_y(fp->track[1]);
+				const auto bottom_limit = normalize_y(fp->track[3]);
+				((*effects_ruck)[effects_id])->peak_envelope_generator.set_limit(top_limit, bottom_limit);
+				break;
+			}
+			case 4U:
+			{
+				const auto top_limit = normalize_y(fp->track[1]);
+				const auto bottom_limit = normalize_y(fp->track[3]);
+				((*effects_ruck)[effects_id])->peak_envelope_generator.set_limit(top_limit, bottom_limit);
+				break;
+			}
+			case 7U:
+			{
+				const auto sustain = static_cast<uint32_t>(fp->track[6]);
+				((*effects_ruck)[effects_id])->peak_envelope_generator.set_sustain(sustain);
+				break;
+			}
+			case 8U:
+			{
+				const auto release = static_cast<uint32_t>(fp->track[7]);
+				((*effects_ruck)[effects_id])->peak_envelope_generator.set_release(release);
+				break;
+			}
+			case 9U:
+			{
+				const auto gain_val = normalize_y(fp->track[8]);
+				((*effects_ruck)[effects_id])->limiter.update_gain(gain_val);
+				break;
+			}
+			default:
+				break;
+			}
+		}
 		return true;
 	}
 }
@@ -741,6 +270,8 @@ constexpr AviUtl::FilterPluginDLL filter{
 	.track_s = const_cast<int32_t*>(std::data(luminance_limiter_sg::track_s)),
 	.track_e = const_cast<int32_t*>(std::data(luminance_limiter_sg::track_e)),
 	.func_proc = &luminance_limiter_sg::func_proc,
+	.func_init = &luminance_limiter_sg::func_init,
+	.func_update = &luminance_limiter_sg::func_update,
 	.information = luminance_limiter_sg::information,
 };
 
