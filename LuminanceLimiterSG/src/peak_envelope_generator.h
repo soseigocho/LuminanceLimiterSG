@@ -19,7 +19,7 @@ namespace luminance_limiter_sg {
 	public:
 		BOOL set_limit(const NormalizedY top, const NormalizedY bottom) noexcept;
 		BOOL set_sustain(const uint32_t sustain);
-		BOOL set_release(const uint32_t release);
+		BOOL set_release(const float release);
 		std::array<NormalizedY, 2> hold_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept;
 		std::array<NormalizedY, 2> wrap_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept;
 		std::array<NormalizedY, 2> update_and_get_envelope_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept;
@@ -30,11 +30,11 @@ namespace luminance_limiter_sg {
 		std::optional<std::deque<NormalizedY>> active_top_peak_buffer = std::nullopt;
 		std::optional<std::deque<NormalizedY>> active_bottom_peak_buffer = std::nullopt;
 		uint32_t sustain = 0u;
-		uint32_t release = 0u;
+		float release = 0.0f;
 		NormalizedY ongoing_top_peak = 0.0f;
-		uint32_t top_peak_duration = 0u;
+		float top_peak_duration = 0.0f;
 		NormalizedY ongoing_bottom_peak = 0.0f;
-		uint32_t bottom_peak_duration = 0u;
+		float bottom_peak_duration = 0.0f;
 
 		NormalizedY top_limit = 0.0f;
 		NormalizedY bottom_limit = 0.0f;
