@@ -163,16 +163,17 @@ namespace luminance_limiter_sg {
 		AviUtl::FileInfo fi;
 		fp->exfunc->get_file_info(fpip->editp, &fi);
 		fps = static_cast<float>(fi.video_rate);
+		if (!fps.has_value())
+		{
+			throw std::runtime_error("Fps has not initialized.");
+		}
+
 		if (!check_and_fill_effects_ruck(effects_id))
 		{
 			const auto top_limit = normalize_y(fp->track[1]);
 			const auto bottom_limit = normalize_y(fp->track[3]);
 			((*effects_ruck)[effects_id])->peak_envelope_generator.set_limit(top_limit, bottom_limit);
 
-			if (!fps.has_value())
-			{
-				throw std::runtime_error("Fpms has not initialized.");
-			}
 			const auto sustain = static_cast<uint32_t>(std::floor(static_cast<float>(fp->track[6]) * fps.value() / 1000.0f ));
 			((*effects_ruck)[effects_id])->peak_envelope_generator.set_sustain(sustain);
 
