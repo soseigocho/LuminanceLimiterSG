@@ -19,6 +19,7 @@
 
 namespace luminance_limiter_sg {
 	constexpr static inline auto name = "LuminanceLimiterSG";
+	
 	constexpr static inline auto track_n = 11u;
 	constexpr static inline auto track_name =
 		std::array<const char*, track_n>{ "ID", "ãŒÀ", "ãŒÀè‡’l", "‰ºŒÀ", "‰ºŒÀè‡’l", "•âŠÔÓ°ÄŞ", "‘±(ms)", "—]‰C(ms)", "µÌ¾¯Ä", "–¾‚é‚³", "ˆÃ‚³"};
@@ -26,6 +27,13 @@ namespace luminance_limiter_sg {
 	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, 0, -4096, 0, 0, 0, 0, 0, -4096, -4096, -4096 };
 	constexpr static inline auto num_or_rucks = 16UL;
 	constexpr static inline auto track_e = std::array<int32_t, track_n>{ num_or_rucks, 4096, 0, 4096, 4096, 2, 256, 256, 4096, 4096, 4096 };
+
+	constexpr static inline auto on = 1UL;
+	constexpr static inline auto off = 0UL;
+	constexpr static inline auto check_n = 1u;
+	constexpr static inline auto check_name = std::array<const char*, check_n>{"Limiter Mode"};
+	constexpr static inline auto check_default = std::array<int32_t, check_n>{off};
+
 	constexpr static inline auto information = "LuminanceLimiterSG v0.2.0 by ‘e»ŒŞ’·";
 
 	constexpr static inline auto y_max = 4096.0F;
@@ -278,6 +286,9 @@ constexpr AviUtl::FilterPluginDLL filter{
 	.track_default = const_cast<int32_t*>(std::data(luminance_limiter_sg::track_default)),
 	.track_s = const_cast<int32_t*>(std::data(luminance_limiter_sg::track_s)),
 	.track_e = const_cast<int32_t*>(std::data(luminance_limiter_sg::track_e)),
+	.check_n = luminance_limiter_sg::check_n,
+	.check_name = const_cast<const char**>(std::data(luminance_limiter_sg::check_name)),
+	.check_default = const_cast<int32_t*>(std::data(luminance_limiter_sg::check_default)),
 	.func_proc = &luminance_limiter_sg::func_proc,
 	.func_init = &luminance_limiter_sg::func_init,
 	.func_update = &luminance_limiter_sg::func_update,
