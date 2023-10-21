@@ -21,8 +21,8 @@ namespace luminance_limiter_sg {
 	constexpr static inline auto name = "LuminanceLimiterSG";
 	constexpr static inline auto track_n = 11u;
 	constexpr static inline auto track_name =
-		std::array<const char*, track_n>{ "ID", "上限", "上限閾値", "下限", "下限閾値", "補間ﾓｰﾄﾞ", "持続", "余韻", "ｵﾌｾｯﾄ", "明るさ", "暗さ"};
-	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 0, 4096, -1024, 256, 512, 0, 4, 8, -128, 512, -64 };
+		std::array<const char*, track_n>{ "ID", "上限", "上限閾値", "下限", "下限閾値", "補間ﾓｰﾄﾞ", "持続(ms)", "余韻(ms)", "ｵﾌｾｯﾄ", "明るさ", "暗さ"};
+	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 0, 4096, -1024, 256, 512, 0, 100, 400, -128, 512, -64 };
 	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, 0, -4096, 0, 0, 0, 0, 0, -4096, -4096, -4096 };
 	constexpr static inline auto num_or_rucks = 16UL;
 	constexpr static inline auto track_e = std::array<int32_t, track_n>{ num_or_rucks, 4096, 0, 4096, 4096, 2, 256, 256, 4096, 4096, 4096 };
@@ -30,6 +30,8 @@ namespace luminance_limiter_sg {
 
 	constexpr static inline auto y_max = 4096.0F;
 	constexpr static inline auto y_min = 0.0F;
+
+	static std::optional<float> fps = std::nullopt;
 
 	template <typename T>
 	NormalizedY normalize_y(const T y) noexcept {
@@ -150,16 +152,23 @@ namespace luminance_limiter_sg {
 		}
 
 		const auto effects_id = static_cast<uint32_t>(fp->track[0]);
+		AviUtl::FileInfo fi;
+		fp->exfunc->get_file_info(fpip->editp, &fi);
+		fps = static_cast<float>(fi.video_rate);
 		if (!check_and_fill_effects_ruck(effects_id))
 		{
 			const auto top_limit = normalize_y(fp->track[1]);
 			const auto bottom_limit = normalize_y(fp->track[3]);
 			((*effects_ruck)[effects_id])->peak_envelope_generator.set_limit(top_limit, bottom_limit);
 
-			const auto sustain = static_cast<uint32_t>(fp->track[6]);
+			if (!fps.has_value())
+			{
+				throw std::runtime_error("Fpms has not initialized.");
+			}
+			const auto sustain = static_cast<uint32_t>(std::floor(static_cast<float>(fp->track[6]) * fps.value() / 1000.0f ));
 			((*effects_ruck)[effects_id])->peak_envelope_generator.set_sustain(sustain);
 
-			const auto release = static_cast<uint32_t>(fp->track[7]);
+			const auto release = std::ceil(static_cast<float>(fp->track[7]) * fps.value() / 1000.0f );
 			((*effects_ruck)[effects_id])->peak_envelope_generator.set_release(release);
 
 			const auto gain_val = normalize_y(fp->track[8]);

@@ -6,6 +6,10 @@
 */
 
 
+#pragma once
+
+#include <cmath>
+
 #include "peak_envelope_generator.h"
 
 
@@ -21,7 +25,7 @@ namespace luminance_limiter_sg {
 	{
 		this->sustain = sustain;
 
-		if (sustain == 0)
+		if (sustain == 0u)
 		{
 			this->top_peak_lifetime_buffer = std::nullopt;
 			this->bottom_peak_lifetime_buffer = std::nullopt;
@@ -30,53 +34,54 @@ namespace luminance_limiter_sg {
 			return false;
 		}
 
+		const auto current_buffer_size = sustain + 1u;
 		if (!top_peak_lifetime_buffer.has_value() || !active_top_peak_buffer.has_value()
 			|| !bottom_peak_lifetime_buffer.has_value() || !active_bottom_peak_buffer.has_value())
 		{
 			this->top_peak_lifetime_buffer =
-				std::make_optional<std::deque<NormalizedY>>(sustain + 1, -std::numeric_limits<NormalizedY>::infinity());
+				std::make_optional<std::deque<NormalizedY>>(current_buffer_size, -std::numeric_limits<NormalizedY>::infinity());
 			this->active_top_peak_buffer = std::make_optional<std::deque<NormalizedY>>();
 			this->bottom_peak_lifetime_buffer =
-				std::make_optional<std::deque<NormalizedY>>(sustain + 1, std::numeric_limits<NormalizedY>::infinity());
+				std::make_optional<std::deque<NormalizedY>>(current_buffer_size, std::numeric_limits<NormalizedY>::infinity());
 			this->active_bottom_peak_buffer = std::make_optional<std::deque<NormalizedY>>();
 
 			return true;
 		}
 
-		if (top_peak_lifetime_buffer.value().size() == (sustain + 1)
-			&& bottom_peak_lifetime_buffer.value().size() == (sustain + 1))
+		if (top_peak_lifetime_buffer.value().size() == current_buffer_size
+			&& bottom_peak_lifetime_buffer.value().size() == current_buffer_size)
 		{
 			return true;
 		}
 
-		if (top_peak_lifetime_buffer.value().size() > (sustain + 1))
+		if (top_peak_lifetime_buffer.value().size() > current_buffer_size)
 		{
 			top_peak_lifetime_buffer.value().erase(
 				top_peak_lifetime_buffer.value().begin(),
 				top_peak_lifetime_buffer.value().begin()
-				+ (top_peak_lifetime_buffer.value().size() - (sustain + 1)));
+				+ (top_peak_lifetime_buffer.value().size() - current_buffer_size));
 		}
 
-		if (bottom_peak_lifetime_buffer.value().size() > (sustain + 1))
+		if (bottom_peak_lifetime_buffer.value().size() > current_buffer_size)
 		{
 			bottom_peak_lifetime_buffer.value().erase(
 				bottom_peak_lifetime_buffer.value().begin(),
 				bottom_peak_lifetime_buffer.value().begin()
-				+ (bottom_peak_lifetime_buffer.value().size() - (sustain + 1)));
+				+ (bottom_peak_lifetime_buffer.value().size() - current_buffer_size));
 		}
 
-		if (top_peak_lifetime_buffer.value().size() < (sustain + 1))
+		if (top_peak_lifetime_buffer.value().size() < current_buffer_size)
 		{
-			const auto top_shrink_size = sustain + 1 - top_peak_lifetime_buffer.value().size();
+			const auto top_shrink_size = current_buffer_size - top_peak_lifetime_buffer.value().size();
 			for (auto i = 0; i < top_shrink_size; i++)
 			{
 				top_peak_lifetime_buffer.value().push_front(0.0f);
 			}
 		}
 
-		if (bottom_peak_lifetime_buffer.value().size() < (sustain + 1))
+		if (bottom_peak_lifetime_buffer.value().size() < current_buffer_size)
 		{
-			const auto bottom_shrink_size = sustain + 1 - bottom_peak_lifetime_buffer.value().size();
+			const auto bottom_shrink_size = current_buffer_size - bottom_peak_lifetime_buffer.value().size();
 			for (auto i = 0; i < bottom_shrink_size; i++)
 			{
 				bottom_peak_lifetime_buffer.value().push_front(0.0f);
@@ -86,7 +91,7 @@ namespace luminance_limiter_sg {
 		return true;
 	};
 
-	BOOL PeakEnvelopeGenerator::set_release(const uint32_t release)
+	BOOL PeakEnvelopeGenerator::set_release(const float release)
 	{
 		this->release = release;
 		return true;
@@ -141,19 +146,19 @@ namespace luminance_limiter_sg {
 		if (ongoing_top_peak == top_peak)
 		{
 			wraped_top = top_peak;
-			top_peak_duration = 0u;
+			top_peak_duration = 0.0f;
 		}
 		else
 		{
 			top_peak_duration++;
-			const auto coefficient = -(ongoing_top_peak - bottom_limit) / static_cast<float>(release);
+			const auto coefficient = -(ongoing_top_peak - bottom_limit) / release;
 			const auto slice = ongoing_top_peak;
-			const auto released = coefficient * static_cast<float>(top_peak_duration) + slice;
+			const auto released = coefficient * top_peak_duration + slice;
 			if (top_peak >= released)
 			{
 				wraped_top = top_peak;
 				ongoing_top_peak = top_peak;
-				top_peak_duration = 0u;
+				top_peak_duration = 0.0f;
 			}
 			else
 			{
@@ -165,19 +170,19 @@ namespace luminance_limiter_sg {
 		if (ongoing_bottom_peak == bottom_peak)
 		{
 			wraped_bottom = bottom_peak;
-			bottom_peak_duration = 0u;
+			bottom_peak_duration = 0.0f;
 		}
 		else
 		{
 			bottom_peak_duration++;
-			const auto coefficient = -(ongoing_bottom_peak - top_limit) / static_cast<float>(release);
+			const auto coefficient = -(ongoing_bottom_peak - top_limit) / release;
 			const auto slice = ongoing_bottom_peak;
-			const auto released = coefficient * static_cast<float>(bottom_peak_duration) + slice;
+			const auto released = coefficient * bottom_peak_duration + slice;
 			if (bottom_peak <= released)
 			{
 				wraped_bottom = bottom_peak;
 				ongoing_bottom_peak = bottom_peak;
-				bottom_peak_duration = 0u;
+				bottom_peak_duration = 0.0f;
 			}
 			else
 			{
