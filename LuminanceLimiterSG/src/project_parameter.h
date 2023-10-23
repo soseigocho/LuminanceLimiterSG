@@ -8,5 +8,18 @@
 
 #pragma once
 
+#include <optional>
 
-auto __stdcall GetFilterTable();
+
+namespace luminance_limiter_sg
+{
+	struct ProjectParameter
+	{
+		static std::optional<float>& fps() noexcept
+		{
+			static std::optional<float> fps_data;
+			return fps_data;
+		}
+	};
+
+}
