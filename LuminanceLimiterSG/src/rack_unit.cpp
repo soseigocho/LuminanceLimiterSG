@@ -11,6 +11,7 @@
 #include "luminance.h"
 #include "project_parameter.h"
 
+#include <iostream>
 
 namespace luminance_limiter_sg
 {
@@ -20,17 +21,17 @@ namespace luminance_limiter_sg
 		const auto bottom_limit = normalize_y(fp->track[3]);
 		peak_envelope_generator.set_limit(top_limit, bottom_limit);
 
-		if (!fps.has_value())
+		if (!ProjectParameter::fps())
 		{
-			throw std::runtime_error("Fpms has not initialized.");
+			throw std::runtime_error("Fps has not initialized.");
 		}
-		const auto sustain = static_cast<uint32_t>(std::floor(static_cast<float>(fp->track[6]) * fps.value() / 1000.0f));
+		const auto sustain = static_cast<uint32_t>(std::floor(static_cast<float>(fp->track[6]) * ProjectParameter::fps().value() / 1000.0f));
 		peak_envelope_generator.set_sustain(sustain);
 
-		const auto release = std::ceil(static_cast<float>(fp->track[7]) * fps.value() / 1000.0f);
+		const auto release = std::ceil(static_cast<float>(fp->track[7]) * ProjectParameter::fps().value() / 1000.0f);
 		peak_envelope_generator.set_release(release);
-
-		const auto gain_val = normalize_y(fp->track[8]);
+\
+const auto gain_val = normalize_y(fp->track[8]);
 		limiter.update_gain(gain_val);
 	}
 

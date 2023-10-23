@@ -13,5 +13,13 @@
 
 namespace luminance_limiter_sg
 {
-	static inline std::optional<float> fps = std::nullopt;
+	struct ProjectParameter
+	{
+		static std::optional<float>& fps() noexcept
+		{
+			static std::optional<float> fps_data;
+			return fps_data;
+		}
+	};
+
 }

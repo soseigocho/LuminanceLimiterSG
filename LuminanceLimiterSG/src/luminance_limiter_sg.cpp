@@ -39,6 +39,13 @@ namespace luminance_limiter_sg {
 
 	static inline BOOL func_proc(AviUtl::FilterPlugin* fp, AviUtl::FilterProcInfo* fpip)
 	{
+		if (!ProjectParameter::fps())
+		{
+			AviUtl::FileInfo fi;
+			fp->exfunc->get_file_info(fpip->editp, &fi);
+			ProjectParameter::fps() = static_cast<float>(fi.video_rate);
+		}
+
 		if (!processing_buffer)
 		{
 			processing_buffer = Buffer(fpip->max_w, fpip->max_h);
@@ -49,31 +56,20 @@ namespace luminance_limiter_sg {
 			rack.gc();
 		}
 
-		AviUtl::FileInfo fi;
-		fp->exfunc->get_file_info(fpip->editp, &fi);
-		fps = static_cast<float>(fi.video_rate);
-
 		auto effector_id = static_cast<unsigned int>(fp->track[0]);
 		auto processing_mode = static_cast<ProcessingMode>(fp->check[0]);
 		if (!rack[effector_id])
 		{
-			printf("eff setするよ\n");
 			rack.set_effector(effector_id, processing_mode, fp);
-			printf("eff set終わったはずだよ\n");
 		}
 
-		printf("aged bit立てるよ\n");
 		rack[effector_id].value()->used();
 
-		printf("輝度引っ張るよ\n");
 		processing_buffer.value().fetch_image(fpip->w, fpip->h, static_cast<AviUtl::PixelYC*>(fpip->ycp_edit));
 
-		printf("リミッター設定するよ\n");
 		rack[effector_id].value()->fetch_trackbar_and_buffer(fp, processing_buffer.value());
 
-		printf("本処理入るよ\n");
 		processing_buffer.value().pixelwise_map(rack[effector_id].value()->effect());
-		printf("レンダリングするよ\n");
 		processing_buffer.value().render(fpip->w, fpip->h, static_cast<AviUtl::PixelYC*>(fpip->ycp_edit));
 
 		return true;

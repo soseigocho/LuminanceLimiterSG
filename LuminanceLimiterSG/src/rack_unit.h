@@ -17,7 +17,6 @@ namespace luminance_limiter_sg
 {
 	class RackUnit {
 	public:
-		RackUnit() = delete;
 		RackUnit(AviUtl::FilterPlugin* fp);
 
 		const std::function<float(float)> effect() const noexcept;
