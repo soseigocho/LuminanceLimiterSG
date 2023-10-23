@@ -25,7 +25,7 @@ namespace luminance_limiter_sg
 
 		template<typename F>
 		inline const void pixelwise_map(const F&& f) {
-			for (auto& elem : buffer)
+			for (auto&& elem : buffer)
 			{
 				elem = f(elem);
 			}

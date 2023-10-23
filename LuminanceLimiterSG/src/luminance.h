@@ -20,12 +20,12 @@ namespace luminance_limiter_sg
 	};
 
 	template <typename T>
-	T normalize_y(const T y) noexcept {
+	float normalize_y(const T y) noexcept {
 		return static_cast<float>(y) / Luminance::y_max;
 	}
 
 	template <typename T>
-	T denormalize_y(const T y) noexcept {
+	T denormalize_y(const float y) noexcept {
 		return static_cast<T>(y * Luminance::y_max);
 	}
 }

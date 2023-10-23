@@ -11,7 +11,6 @@
 #include "luminance.h"
 #include "project_parameter.h"
 
-#include <iostream>
 
 namespace luminance_limiter_sg
 {
