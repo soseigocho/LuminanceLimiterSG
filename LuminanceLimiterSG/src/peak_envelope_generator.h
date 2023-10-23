@@ -13,6 +13,7 @@
 #include <deque>
 #include <optional>
 
+#include "buffer.h"
 
 namespace luminance_limiter_sg {
 	class PeakEnvelopeGenerator {

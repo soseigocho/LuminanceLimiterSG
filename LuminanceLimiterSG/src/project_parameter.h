@@ -5,15 +5,13 @@
 	obtain one at https ://mozilla.org/MPL/2.0/.
 */
 
+
 #pragma once
 
-#include "limiter.h"
-#include "peak_envelope_generator.h"
+#include <optional>
 
-namespace luminance_limiter_sg {
-	struct RuckUnit {
-		bool used;
-		Limiter limiter;
-		PeakEnvelopeGenerator peak_envelope_generator;
-	};
+
+namespace luminance_limiter_sg
+{
+	static inline std::optional<float> fps = std::nullopt;
 }

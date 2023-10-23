@@ -9,4 +9,11 @@
 #pragma once
 
 
-auto __stdcall GetFilterTable();
+namespace luminance_limiter_sg
+{
+	enum class ProcessingMode
+	{
+		Compressor,
+		Limiter
+	};
+}

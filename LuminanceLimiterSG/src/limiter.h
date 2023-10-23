@@ -11,9 +11,12 @@
 
 #include "luminance_limiter_sg.h"
 
+#include <algorithm>
 #include <functional>
 #include <optional>
 #include <stdexcept>
+
+#include "buffer.h"
 
 
 namespace luminance_limiter_sg {

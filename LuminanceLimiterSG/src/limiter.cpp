@@ -8,6 +8,7 @@
 
 #include "luminance_limiter_sg.h"
 #include "limiter.h"
+#include "luminance.h"
 
 
 namespace luminance_limiter_sg {
