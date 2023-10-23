@@ -36,7 +36,7 @@ const auto gain_val = normalize_y(fp->track[8]);
 
 	const std::function<float(float)> RackUnit::effect() const noexcept
 	{
-		return [=](float y) -> float { return limiter.limit(limiter.scale_and_gain(y)); };
+		return [&](float y) -> float { return limiter.limit(limiter.scale_and_gain(y)); };
 	}
 
 	const void RackUnit::fetch_trackbar_and_buffer(AviUtl::FilterPlugin* fp, const Buffer& buffer)

@@ -58,13 +58,12 @@ namespace luminance_limiter_sg {
 
 		auto effector_id = static_cast<unsigned int>(fp->track[0]);
 		auto processing_mode = static_cast<ProcessingMode>(fp->check[0]);
-		if (!rack[effector_id])
+
+		if (!rack[effector_id]);
 		{
 			rack.set_effector(effector_id, processing_mode, fp);
 		}
 
-		// アクセス違反, 所有権がどっか行っちゃった……ってコト!?
-		// ラムダ式周りだと思うんだけどよく分からんのよな
 		rack[effector_id].value()->used();
 
 		processing_buffer.value().fetch_image(fpip->w, fpip->h, static_cast<AviUtl::PixelYC*>(fpip->ycp_edit));

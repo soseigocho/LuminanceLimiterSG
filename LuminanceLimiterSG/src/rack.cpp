@@ -22,13 +22,13 @@ namespace luminance_limiter_sg
 		{
 			if (elem)
 			{
-				if (!elem.value()->is_using())
+				if (!(elem.value()->is_using()))
 				{
 					elem.reset();
 				}
 				else
 				{
-					elem->reset();
+					elem.value()->reset();
 				}
 			}
 		}
