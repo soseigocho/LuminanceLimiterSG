@@ -24,6 +24,18 @@
     <ClCompile Include="src\limiter.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\rack.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rack_unit.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\buffer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\compressor.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\luminance_limiter_sg.h">
@@ -32,7 +44,28 @@
     <ClInclude Include="src\limiter.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\ruck_unit.h">
+    <ClInclude Include="src\processing_mode.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rack.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rack_unit.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\luminance.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\project_parameter.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\buffer.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\compressor.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\effector.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
