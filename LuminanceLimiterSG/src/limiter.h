@@ -1,4 +1,3 @@
-#pragma once
 /*
 	Copyright(c) 2023 SoseiGocho
 	This Source Code Form is subject to the terms of the Mozilla Public License,
@@ -17,6 +16,8 @@
 #include <stdexcept>
 
 #include "buffer.h"
+#include "peak_envelope_generator.h"
+#include "rack_unit.h"
 
 
 namespace luminance_limiter_sg {
@@ -111,7 +112,7 @@ namespace luminance_limiter_sg {
 		return character(top_limit, top_threshold_diff, bottom_limit, bottom_threshold_diff, top_peak, bottom_peak);
 	}
 
-	template <typename F>
+	template<typename F>
 	constexpr static inline auto make_limit(
 		const F&& character,
 		const NormalizedY top_limit,
@@ -136,9 +137,26 @@ namespace luminance_limiter_sg {
 
 	constexpr inline auto id = [](auto x) -> auto { return x; };
 
-	class Limiter {
+	class Limiter final : public IRackUnit
+	{
 	public:
-		Limiter();
+		Limiter(AviUtl::FilterPlugin* fp);
+
+		const std::function<float(float)> effect() const noexcept;
+		const void fetch_trackbar_and_buffer(AviUtl::FilterPlugin* fp, const Buffer& buffer) override;
+
+		const void used() noexcept override;
+		const void reset() noexcept override;
+
+		const bool is_using() const noexcept override;
+	private:
+		bool use = false;
+		PeakEnvelopeGenerator peak_envelope_generator;
+
+		std::function<float(float)> scale = id;
+		std::function<float(float)> gain = id;
+		std::function<NormalizedY(NormalizedY)> limiter = id;
+
 		BOOL update_scale(
 			const NormalizedY orig_top, const NormalizedY orig_bottom,
 			const NormalizedY top_diff, const NormalizedY bottom_diff);
@@ -150,9 +168,6 @@ namespace luminance_limiter_sg {
 			InterpolationMode mode);
 		NormalizedY scale_and_gain(const NormalizedY y) const;
 		NormalizedY limit(const NormalizedY y) const;
-	private:
-		std::function<float(float)> scale = id;
-		std::function<float(float)> gain = id;
-		std::function<NormalizedY(NormalizedY)> limiter = id;
+
 	};
 }

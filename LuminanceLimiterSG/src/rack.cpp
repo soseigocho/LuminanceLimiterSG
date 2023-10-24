@@ -52,7 +52,7 @@ namespace luminance_limiter_sg
 			elements[idx].reset();
 			return;
 		case ProcessingMode::Limiter:
-			elements[idx] = std::make_unique<RackUnit>(fp);
+			elements[idx] = std::make_unique<RackUnit<Compressor, Limiter>>(fp);
 			return;
 		default:
 			elements[idx].reset();
@@ -65,7 +65,7 @@ namespace luminance_limiter_sg
 		return elements.size();
 	}
 
-	std::optional<std::unique_ptr<RackUnit>>& Rack::operator[] (size_t idx) noexcept
+	std::optional<std::unique_ptr<RackUnit<Compressor, Limiter>>>& Rack::operator[] (size_t idx) noexcept
 	{
 		return elements[idx];
 	}

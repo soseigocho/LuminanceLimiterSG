@@ -14,7 +14,8 @@
 #include <memory>
 
 #include "processing_mode.h"
-
+#include "compressor.h"
+#include "limiter.h"
 
 namespace luminance_limiter_sg
 {
@@ -32,9 +33,9 @@ namespace luminance_limiter_sg
 
 		uint32_t size() const noexcept;
 
-		std::optional<std::unique_ptr<RackUnit>>& operator[] (size_t idx) noexcept;
+		std::optional<std::unique_ptr<RackUnit<Compressor, Limiter>>>& operator[] (size_t idx) noexcept;
 	private:
 		uint32_t ongoing_frame = 0;
-		std::array<std::optional<std::unique_ptr<RackUnit>>, num_or_racks> elements;
+		std::array<std::optional<std::unique_ptr<RackUnit<Compressor, Limiter>>>, num_or_racks> elements;
 	};
 }

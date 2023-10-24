@@ -59,18 +59,18 @@ namespace luminance_limiter_sg {
 		auto effector_id = static_cast<unsigned int>(fp->track[0]);
 		auto processing_mode = static_cast<ProcessingMode>(fp->check[0]);
 
-		if (!rack[effector_id]);
+		if (!rack[effector_id])
 		{
 			rack.set_effector(effector_id, processing_mode, fp);
 		}
 
-		rack[effector_id].value()->used();
+		std::visit([](auto& x) { x.used(); }, *rack[effector_id].value());
 
 		processing_buffer.value().fetch_image(fpip->w, fpip->h, static_cast<AviUtl::PixelYC*>(fpip->ycp_edit));
 
-		rack[effector_id].value()->fetch_trackbar_and_buffer(fp, processing_buffer.value());
+		std::visit([&](auto& x) { x.fetch_trackbar_and_buffer(fp, processing_buffer.value()); }, *rack[effector_id].value());;
 
-		processing_buffer.value().pixelwise_map(rack[effector_id].value()->effect());
+		processing_buffer.value().pixelwise_map(std::visit([](auto& x) { return x.effect(); }, *rack[effector_id].value()));
 		processing_buffer.value().render(fpip->w, fpip->h, static_cast<AviUtl::PixelYC*>(fpip->ycp_edit));
 
 		return true;

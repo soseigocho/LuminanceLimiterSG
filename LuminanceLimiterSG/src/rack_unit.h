@@ -8,28 +8,34 @@
 
 #pragma once
 
-#include "aviutl/filter.hpp"
-#include "limiter.h"
-#include "peak_envelope_generator.h"
+#include <functional>
+#include <variant>
+
+#include "aviutl/FilterPlugin.hpp"
+#include "buffer.h"
+#include "effector.h"
 
 
 namespace luminance_limiter_sg
 {
-	class RackUnit {
+	class IRackUnit
+	{
 	public:
-		RackUnit(AviUtl::FilterPlugin* fp);
+		virtual const void fetch_trackbar_and_buffer(AviUtl::FilterPlugin* fp, const Buffer& buffer) = 0;
 
-		const std::function<float(float)> effect() const noexcept;
-		const void fetch_trackbar_and_buffer(AviUtl::FilterPlugin* fp, const Buffer& buffer);
+		virtual const void used() noexcept = 0;
+		virtual const void reset() noexcept = 0;
 
-		const void used() noexcept;
-		const void reset() noexcept;
-
-		const bool is_using() const noexcept;
-
-		Limiter limiter;
-		PeakEnvelopeGenerator peak_envelope_generator;
-	private:
-		bool use = false;
+		virtual const bool is_using() const noexcept = 0;
 	};
+
+	template<typename T>
+	concept CRackUnit = requires
+	{
+		Effector<T>;
+		std::derived_from<T, IRackUnit>;
+	};
+
+	template<CRackUnit ...Args>
+	using RackUnit = std::variant<Args...>;
 }
