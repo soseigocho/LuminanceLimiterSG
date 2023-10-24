@@ -8,7 +8,6 @@
 
 #pragma once
 
-#include <functional>
 #include <variant>
 
 #include "aviutl/FilterPlugin.hpp"
@@ -21,7 +20,8 @@ namespace luminance_limiter_sg
 	class IRackUnit
 	{
 	public:
-		virtual const void fetch_trackbar_and_buffer(AviUtl::FilterPlugin* fp, const Buffer& buffer) = 0;
+		virtual const void fetch_trackbar_and_buffer(const AviUtl::FilterPlugin* const fp, const Buffer& buffer) = 0;
+		virtual const void update_from_trackbar(const AviUtl::FilterPlugin* const fp, const uint32_t track) = 0;
 
 		virtual const void used() noexcept = 0;
 		virtual const void reset() noexcept = 0;
@@ -36,6 +36,6 @@ namespace luminance_limiter_sg
 		std::derived_from<T, IRackUnit>;
 	};
 
-	template<CRackUnit ...Args>
+	template<typename ...Args>
 	using RackUnit = std::variant<Args...>;
 }

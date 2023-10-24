@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include "rack_unit.h"
 
 namespace luminance_limiter_sg
@@ -15,10 +17,11 @@ namespace luminance_limiter_sg
 	class Compressor final : public IRackUnit
 	{
 	public:
-		Compressor(AviUtl::FilterPlugin* fp);
+		Compressor(const AviUtl::FilterPlugin* const fp);
 
 		const std::function<float(float)> effect() const noexcept;
-		const void fetch_trackbar_and_buffer(AviUtl::FilterPlugin* fp, const Buffer& buffer) override;
+		const void fetch_trackbar_and_buffer(const AviUtl::FilterPlugin* const fp, const Buffer& buffer) override;
+		const void update_from_trackbar(const AviUtl::FilterPlugin* const fp, const uint32_t track) override;
 
 		const void used() noexcept override;
 		const void reset() noexcept override;

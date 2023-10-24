@@ -29,7 +29,7 @@ namespace luminance_limiter_sg
 		const void gc() noexcept;
 
 		const bool is_first_time(uint32_t current_frame) noexcept;
-		const void set_effector(uint32_t idx, ProcessingMode processing_mode, AviUtl::FilterPlugin* fp);
+		const void set_effector(uint32_t idx, ProcessingMode processing_mode, const AviUtl::FilterPlugin* const fp);
 
 		uint32_t size() const noexcept;
 

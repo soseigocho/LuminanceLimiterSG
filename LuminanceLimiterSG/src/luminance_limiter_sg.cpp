@@ -68,9 +68,9 @@ namespace luminance_limiter_sg {
 
 		processing_buffer.value().fetch_image(fpip->w, fpip->h, static_cast<AviUtl::PixelYC*>(fpip->ycp_edit));
 
-		std::visit([&](auto& x) { x.fetch_trackbar_and_buffer(fp, processing_buffer.value()); }, *rack[effector_id].value());;
+		std::visit([&](auto& x) { x.fetch_trackbar_and_buffer(fp, processing_buffer.value()); }, *rack[effector_id].value());
 
-		processing_buffer.value().pixelwise_map(std::visit([](auto& x) { return x.effect(); }, *rack[effector_id].value()));
+		processing_buffer.value().pixelwise_map(std::visit([](const auto& x) { return x.effect(); }, *rack[effector_id].value()));
 		processing_buffer.value().render(fpip->w, fpip->h, static_cast<AviUtl::PixelYC*>(fpip->ycp_edit));
 
 		return true;
@@ -86,53 +86,7 @@ namespace luminance_limiter_sg {
 				- static_cast<std::underlying_type<AviUtl::detail::FilterPluginUpdateStatus>::type>(AviUtl::detail::FilterPluginUpdateStatus::Track);
 
 			const auto effector_id = static_cast<uint32_t>(fp->track[0]);
-			auto processing_mode = static_cast<ProcessingMode>(fp->check[0]);
-			if (rack[effector_id])
-			{
-				rack.set_effector(effector_id, processing_mode, fp);
-			}
-
-			switch (track)
-			{
-			case 1U:
-			{
-				break;
-			}
-			case 2U:
-			{
-				const auto top_limit = normalize_y(fp->track[1]);
-				const auto bottom_limit = normalize_y(fp->track[3]);
-				rack[effector_id].value()->peak_envelope_generator.set_limit(top_limit, bottom_limit);
-				break;
-			}
-			case 4U:
-			{
-				const auto top_limit = normalize_y(fp->track[1]);
-				const auto bottom_limit = normalize_y(fp->track[3]);
-				rack[effector_id].value()->peak_envelope_generator.set_limit(top_limit, bottom_limit);
-				break;
-			}
-			case 7U:
-			{
-				const auto sustain = static_cast<uint32_t>(fp->track[6]);
-				rack[effector_id].value()->peak_envelope_generator.set_sustain(sustain);
-				break;
-			}
-			case 8U:
-			{
-				const auto release = static_cast<uint32_t>(fp->track[7]);
-				rack[effector_id].value()->peak_envelope_generator.set_release(release);
-				break;
-			}
-			case 9U:
-			{
-				const auto gain_val = normalize_y(fp->track[8]);
-				rack[effector_id].value()->limiter.update_gain(gain_val);
-				break;
-			}
-			default:
-				break;
-			}
+			std::visit([&](auto& x) { x.update_from_trackbar(fp, track); }, *rack[effector_id].value());
 		}
 		return true;
 	}

@@ -140,10 +140,11 @@ namespace luminance_limiter_sg {
 	class Limiter final : public IRackUnit
 	{
 	public:
-		Limiter(AviUtl::FilterPlugin* fp);
+		Limiter(const AviUtl::FilterPlugin* const fp);
 
 		const std::function<float(float)> effect() const noexcept;
-		const void fetch_trackbar_and_buffer(AviUtl::FilterPlugin* fp, const Buffer& buffer) override;
+		const void fetch_trackbar_and_buffer(const AviUtl::FilterPlugin* const fp, const Buffer& buffer) override;
+		const void update_from_trackbar(const AviUtl::FilterPlugin* const fp, const uint32_t track) noexcept override;
 
 		const void used() noexcept override;
 		const void reset() noexcept override;

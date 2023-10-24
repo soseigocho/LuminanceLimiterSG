@@ -308,7 +308,7 @@ namespace luminance_limiter_sg {
 		}
 	}
 
-	Limiter::Limiter(AviUtl::FilterPlugin* fp)
+	Limiter::Limiter(const AviUtl::FilterPlugin* const fp)
 	{
 		const auto top_limit = normalize_y(fp->track[1]);
 		const auto bottom_limit = normalize_y(fp->track[3]);
@@ -332,7 +332,7 @@ namespace luminance_limiter_sg {
 		return [&](float y) -> float { return limit(scale_and_gain(y)); };
 	}
 
-	const void Limiter::fetch_trackbar_and_buffer(AviUtl::FilterPlugin* fp, const Buffer& buffer)
+	const void Limiter::fetch_trackbar_and_buffer(const AviUtl::FilterPlugin* const fp, const Buffer& buffer)
 	{
 		const auto orig_top = buffer.maximum();
 		const auto orig_bottom = buffer.minimum();
@@ -356,6 +356,51 @@ namespace luminance_limiter_sg {
 			bottom_limit, bottom_threshold_diff,
 			enveloped_top, enveloped_bottom,
 			limit_character_interpolation_mode);
+	}
+
+	const void Limiter::update_from_trackbar(const AviUtl::FilterPlugin* const fp, const uint32_t track) noexcept
+	{
+		switch (track)
+		{
+		case 1U:
+		{
+			break;
+		}
+		case 2U:
+		{
+			const auto top_limit = normalize_y(fp->track[1]);
+			const auto bottom_limit = normalize_y(fp->track[3]);
+			peak_envelope_generator.set_limit(top_limit, bottom_limit);
+			break;
+		}
+		case 4U:
+		{
+			const auto top_limit = normalize_y(fp->track[1]);
+			const auto bottom_limit = normalize_y(fp->track[3]);
+			peak_envelope_generator.set_limit(top_limit, bottom_limit);
+			break;
+		}
+		case 7U:
+		{
+			const auto sustain = static_cast<uint32_t>(fp->track[6]);
+			peak_envelope_generator.set_sustain(sustain);
+			break;
+		}
+		case 8U:
+		{
+			const auto release = static_cast<uint32_t>(fp->track[7]);
+			peak_envelope_generator.set_release(release);
+			break;
+		}
+		case 9U:
+		{
+			const auto gain_val = normalize_y(fp->track[8]);
+			update_gain(gain_val);
+			break;
+		}
+		default:
+			break;
+		}
 	}
 
 	const void Limiter::used() noexcept

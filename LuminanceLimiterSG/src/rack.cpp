@@ -22,13 +22,13 @@ namespace luminance_limiter_sg
 		{
 			if (elem)
 			{
-				if (!(elem.value()->is_using()))
+				if (!(std::visit([](const auto& x) { return x.is_using(); }, *elem.value())))
 				{
 					elem.reset();
 				}
 				else
 				{
-					elem.value()->reset();
+					std::visit([](auto& x) { x.reset(); }, *elem.value());
 				}
 			}
 		}
@@ -44,19 +44,19 @@ namespace luminance_limiter_sg
 		return result;
 	}
 
-	const void Rack::set_effector(uint32_t idx, ProcessingMode processing_mode, AviUtl::FilterPlugin* fp)
+	const void Rack::set_effector(uint32_t idx, ProcessingMode processing_mode, const AviUtl::FilterPlugin* const fp)
 	{
+		using R = RackUnit<Compressor, Limiter>;
 		switch (processing_mode)
 		{
 		case ProcessingMode::Compressor:
-			elements[idx].reset();
-			return;
-		case ProcessingMode::Limiter:
-			elements[idx] = std::make_unique<RackUnit<Compressor, Limiter>>(fp);
-			return;
+			elements[idx].emplace(std::make_unique<R>(Compressor(fp)));
+			break;
+		case luminance_limiter_sg::ProcessingMode::Limiter:
+			elements[idx].emplace(std::make_unique<R>(Limiter(fp)));
+			break;
 		default:
-			elements[idx].reset();
-			return;
+			break;
 		}
 	}
 
