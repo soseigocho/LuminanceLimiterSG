@@ -22,13 +22,13 @@ namespace luminance_limiter_sg {
 	constexpr static inline auto track_n = 16u;
 	constexpr static inline auto track_name = std::array<const char*, track_n>{
 		"ID",
-		"–¾(in)", "ˆÃ(in)", "µÌ¾¯Ä(in)",
+		"–¾I", "ˆÃI", "µÌ¾¯ÄI",
 		"è‡’l1", "è‡’l2",
 		"A(C)[ms]","S[ms]", "R[ms]",
 		"•âŠÔÓ°ÄŞ",
 		"ˆ³k—¦(C)",
 		"ãŒÀ(L)", "‰ºŒÀ(L)",
-		"–¾(out)", "ˆÃ(out)", "µÌ¾¯Ä(out)" };
+		"–¾O(C)", "ˆÃO(C)", "µÌ¾¯ÄO(C)" };
 	constexpr static inline auto track_default = std::array<int32_t, track_n>{
 		0,
 		0, 0, 0,
