@@ -11,11 +11,9 @@
 #include "luminance_limiter_sg.h"
 
 #include <algorithm>
-#include <functional>
-#include <optional>
-#include <stdexcept>
 
 #include "buffer.h"
+#include "interpolation.h"
 #include "peak_envelope_generator.h"
 #include "rack_unit.h"
 
@@ -27,20 +25,6 @@ namespace luminance_limiter_sg {
 		const NormalizedY orig_top, const NormalizedY orig_bottom,
 		const NormalizedY top_diff, const NormalizedY bottom_diff) noexcept;
 	const inline std::function<NormalizedY(NormalizedY)> make_gain(const NormalizedY gain) noexcept;
-
-	enum class InterpolationMode : int32_t
-	{
-		Linear,
-		Lagrange,
-		Spline
-	};
-
-	const inline std::function<float(float)> linear_interp(const std::vector<float>&& xs, const std::vector<float>&& ys);
-	const inline std::function<float(float)> lagrange_interp(const std::vector<float>&& xs, const std::vector<float>&& ys);
-	constexpr static inline auto tdma(const std::vector<float>& a, const std::vector<float>& b, const std::vector<float>& c, const std::vector<float>& d);
-	constexpr static inline std::optional<int> inner_binary_search(const std::vector<float>& xs, const float x, const int max_idx, const int min_idx);
-	constexpr static inline auto binary_search(const std::vector<float>& xs, const float x);
-	const inline std::function<float(float)> spline_interp(const std::vector<float>&& xs, const std::vector<float>&& ys);
 
 	template<typename F>
 	constexpr static inline auto make_some_charactors(
