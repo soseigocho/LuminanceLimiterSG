@@ -8,6 +8,8 @@
 
 #include "compressor.h"
 
+#include "common_utility.h"
+
 
 namespace luminance_limiter_sg
 {
@@ -16,7 +18,7 @@ namespace luminance_limiter_sg
 
 	const std::function<float(float)> Compressor::effect() const noexcept
 	{
-		return [](auto x) -> auto { return x; };
+		return id;
 	}
 
 	const void Compressor::fetch_trackbar_and_buffer(const AviUtl::FilterPlugin* const fp, const Buffer& buffer)

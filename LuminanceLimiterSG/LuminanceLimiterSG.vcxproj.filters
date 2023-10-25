@@ -27,16 +27,13 @@
     <ClCompile Include="src\rack.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\rack_unit.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\buffer.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\compressor.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\interpolation.cpp">
+    <ClCompile Include="src\amplifier.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
@@ -72,6 +69,12 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\interpolation.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\amplifier.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\common_utility.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

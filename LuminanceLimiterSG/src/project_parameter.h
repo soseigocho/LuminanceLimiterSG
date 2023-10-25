@@ -21,5 +21,4 @@ namespace luminance_limiter_sg
 			return fps_data;
 		}
 	};
-
 }

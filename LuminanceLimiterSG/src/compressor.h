@@ -10,6 +10,7 @@
 
 #include <functional>
 
+#include "amplifier.h"
 #include "rack_unit.h"
 
 namespace luminance_limiter_sg
@@ -29,5 +30,7 @@ namespace luminance_limiter_sg
 		const bool is_using() const noexcept override;
 	private:
 		bool use = false;
+
+		Amplifier pre, post;
 	};
 }

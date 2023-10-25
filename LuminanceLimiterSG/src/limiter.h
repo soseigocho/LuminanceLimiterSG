@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <functional>
 
+#include "amplifier.h"
 #include "buffer.h"
 #include "interpolation.h"
 #include "peak_envelope_generator.h"
@@ -20,13 +21,6 @@
 
 
 namespace luminance_limiter_sg {
-	constexpr static inline auto stretch_scale(const NormalizedY peak, const NormalizedY threashold, const NormalizedY diff) noexcept;
-	constexpr static inline auto stretch_diff(const NormalizedY threashold, const NormalizedY scale, const NormalizedY y) noexcept;
-	const inline std::regular_invocable<NormalizedY> auto make_scale(
-		const NormalizedY orig_top, const NormalizedY orig_bottom,
-		const NormalizedY top_diff, const NormalizedY bottom_diff) noexcept;
-	const inline std::regular_invocable<NormalizedY> auto make_gain(const NormalizedY gain) noexcept;
-
 	template<typename F>
 	constexpr static inline auto make_some_charactors(
 		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
@@ -120,8 +114,6 @@ namespace luminance_limiter_sg {
 			};
 	}
 
-	constexpr inline auto id = [](auto x) -> auto { return x; };
-
 	class Limiter final : public IRackUnit
 	{
 	public:
@@ -137,10 +129,10 @@ namespace luminance_limiter_sg {
 		const bool is_using() const noexcept override;
 	private:
 		bool use = false;
+
+		Amplifier amplifier;
 		PeakEnvelopeGenerator peak_envelope_generator;
 
-		std::function<float(float)> scale = id;
-		std::function<float(float)> gain = id;
 		std::function<NormalizedY(NormalizedY)> limiter = id;
 
 		BOOL update_scale(
@@ -152,7 +144,6 @@ namespace luminance_limiter_sg {
 			const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
 			const NormalizedY top_peak, const NormalizedY bottom_peak,
 			InterpolationMode mode);
-		NormalizedY scale_and_gain(const NormalizedY y) const;
 		NormalizedY limit(const NormalizedY y) const;
 
 	};

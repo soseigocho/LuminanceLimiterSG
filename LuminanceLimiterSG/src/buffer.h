@@ -12,10 +12,10 @@
 #include <vector>
 
 #include "aviutl/filter.hpp"
+#include "common_utility.h"
 
 namespace luminance_limiter_sg
 {
-	using NormalizedY = float;
 	class Buffer {
 	public:
 		Buffer(uint32_t width, uint32_t height) noexcept;
