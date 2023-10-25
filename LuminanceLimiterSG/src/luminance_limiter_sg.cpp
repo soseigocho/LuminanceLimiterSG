@@ -19,12 +19,13 @@
 namespace luminance_limiter_sg {
 	constexpr static inline auto name = "LuminanceLimiterSG";
 	
-	constexpr static inline auto track_n = 15u;
+	constexpr static inline auto track_n = 16u;
 	constexpr static inline auto track_name = std::array<const char*, track_n>{
 		"ID",
 		"–¾(in)", "ˆÃ(in)", "µÌ¾¯Ä(in)",
 		"è‡’l1", "è‡’l2",
 		"A(C)[ms]","S[ms]", "R[ms]",
+		"•âŠÔÓ°ÄŞ",
 		"ˆ³k—¦(C)",
 		"ãŒÀ(L)", "‰ºŒÀ(L)",
 		"–¾(out)", "ˆÃ(out)", "µÌ¾¯Ä(out)" };
@@ -33,6 +34,7 @@ namespace luminance_limiter_sg {
 		0, 0, 0,
 		4096, 0,
 		0, 0, 0,
+		0,
 		1,
 		4096, 0,
 		0, 0, 0 };
@@ -41,14 +43,16 @@ namespace luminance_limiter_sg {
 		-4096, -4096, -4096,
 		0, 0,
 		0, 0, 0,
+		0,
 		1,
-		0, -4096,
+		0, 0,
 		-4096, -4096, -4096 };
 	constexpr static inline auto track_e = std::array<int32_t, track_n>{
 		num_or_racks,
 		4096, 4096, 4096,
 		4096, 4096,
 		4096, 4096, 4096,
+		2,
 		8,
 		4096, 4096,
 		4096, 4096, 4096};
