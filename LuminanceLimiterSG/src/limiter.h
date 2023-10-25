@@ -11,6 +11,7 @@
 #include "luminance_limiter_sg.h"
 
 #include <algorithm>
+#include <functional>
 
 #include "buffer.h"
 #include "interpolation.h"
@@ -21,10 +22,10 @@
 namespace luminance_limiter_sg {
 	constexpr static inline auto stretch_scale(const NormalizedY peak, const NormalizedY threashold, const NormalizedY diff) noexcept;
 	constexpr static inline auto stretch_diff(const NormalizedY threashold, const NormalizedY scale, const NormalizedY y) noexcept;
-	const inline std::function<NormalizedY(NormalizedY)> make_scale(
+	const inline std::regular_invocable<NormalizedY> auto make_scale(
 		const NormalizedY orig_top, const NormalizedY orig_bottom,
 		const NormalizedY top_diff, const NormalizedY bottom_diff) noexcept;
-	const inline std::function<NormalizedY(NormalizedY)> make_gain(const NormalizedY gain) noexcept;
+	const inline std::regular_invocable<NormalizedY> auto make_gain(const NormalizedY gain) noexcept;
 
 	template<typename F>
 	constexpr static inline auto make_some_charactors(

@@ -32,7 +32,7 @@ namespace luminance_limiter_sg {
 		return diff;
 	}
 
-	const inline std::function<NormalizedY(NormalizedY)> make_scale(
+	const inline std::regular_invocable<float> auto make_scale(
 		const NormalizedY orig_top, const NormalizedY orig_bottom,
 		const NormalizedY top_diff, const NormalizedY bottom_diff) noexcept
 	{
@@ -46,7 +46,7 @@ namespace luminance_limiter_sg {
 			};
 	}
 
-	const inline std::function<NormalizedY(NormalizedY)> make_gain(const NormalizedY gain) noexcept
+	const inline std::regular_invocable<float> auto make_gain(const NormalizedY gain) noexcept
 	{
 		return [=](NormalizedY y) {return y + gain; };
 	}
