@@ -19,12 +19,39 @@
 namespace luminance_limiter_sg {
 	constexpr static inline auto name = "LuminanceLimiterSG";
 	
-	constexpr static inline auto track_n = 11u;
-	constexpr static inline auto track_name =
-		std::array<const char*, track_n>{ "ID", "上限", "上限閾値", "下限", "下限閾値", "補間ﾓｰﾄﾞ", "持続(ms)", "余韻(ms)", "ｵﾌｾｯﾄ", "明るさ", "暗さ"};
-	constexpr static inline auto track_default = std::array<int32_t, track_n>{ 0, 4096, -1024, 256, 512, 0, 100, 400, -128, 512, -64 };
-	constexpr static inline auto track_s = std::array<int32_t, track_n>{ 0, 0, -4096, 0, 0, 0, 0, 0, -4096, -4096, -4096 };
-	constexpr static inline auto track_e = std::array<int32_t, track_n>{ num_or_racks, 4096, 0, 4096, 4096, 2, 256, 256, 4096, 4096, 4096 };
+	constexpr static inline auto track_n = 15u;
+	constexpr static inline auto track_name = std::array<const char*, track_n>{
+		"ID",
+		"明(in)", "暗(in)", "ｵﾌｾｯﾄ(in)",
+		"閾値1", "閾値2",
+		"A(C)[ms]","S[ms]", "R[ms]",
+		"圧縮率(C)",
+		"上限(L)", "下限(L)",
+		"明(out)", "暗(out)", "ｵﾌｾｯﾄ(out)" };
+	constexpr static inline auto track_default = std::array<int32_t, track_n>{
+		0,
+		0, 0, 0,
+		4096, 0,
+		0, 0, 0,
+		1,
+		4096, 0,
+		0, 0, 0 };
+	constexpr static inline auto track_s = std::array<int32_t, track_n>{
+		0,
+		-4096, -4096, -4096,
+		0, 0,
+		0, 0, 0,
+		1,
+		0, -4096,
+		-4096, -4096, -4096 };
+	constexpr static inline auto track_e = std::array<int32_t, track_n>{
+		num_or_racks,
+		4096, 4096, 4096,
+		4096, 4096,
+		4096, 4096, 4096,
+		8,
+		4096, 4096,
+		4096, 4096, 4096};
 
 	constexpr static inline auto on = 1UL;
 	constexpr static inline auto off = 0UL;

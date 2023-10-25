@@ -161,6 +161,7 @@
   <ItemGroup>
     <ClCompile Include="src\buffer.cpp" />
     <ClCompile Include="src\compressor.cpp" />
+    <ClCompile Include="src\interpolation.cpp" />
     <ClCompile Include="src\limiter.cpp" />
     <ClCompile Include="src\luminance_limiter_sg.cpp" />
     <ClCompile Include="src\peak_envelope_generator.cpp" />
@@ -173,6 +174,7 @@
     <ClInclude Include="src\buffer.h" />
     <ClInclude Include="src\compressor.h" />
     <ClInclude Include="src\effector.h" />
+    <ClInclude Include="src\interpolation.h" />
     <ClInclude Include="src\limiter.h" />
     <ClInclude Include="src\luminance.h" />
     <ClInclude Include="src\luminance_limiter_sg.h" />

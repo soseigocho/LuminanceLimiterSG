@@ -36,6 +36,9 @@
     <ClCompile Include="src\compressor.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\interpolation.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\luminance_limiter_sg.h">
@@ -66,6 +69,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\effector.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\interpolation.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
