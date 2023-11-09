@@ -23,54 +23,50 @@
 namespace luminance_limiter_sg {
 	template<typename F>
 	constexpr static inline auto make_some_charactors(
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
+		const NormalizedY top_limit, const NormalizedY top_threshold,
+		const NormalizedY bottom_limit, const NormalizedY bottom_threshold,
 		const NormalizedY top_peak, const NormalizedY bottom_peak,
 		const F&& interp_method)
 	{
-		const auto top_threshold = top_limit + top_threshold_diff;
-		const auto bottom_threshold = bottom_limit + bottom_threshold_diff;
 		const auto x0 = bottom_peak <= bottom_limit ? bottom_peak : bottom_limit;
 		const auto x3 = top_peak >= top_limit ? top_peak : top_limit;
 		auto xs = std::vector{ x0, bottom_threshold, top_threshold, x3 };
-		std::sort(xs.begin(), xs.end());
 		auto ys = std::vector{ bottom_limit, bottom_threshold, top_threshold, top_limit };
-		std::sort(ys.begin(), ys.end());
 		return interp_method(std::move(xs), std::move(ys));
 	}
 
 	constexpr static inline auto make_linear_character = [](
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
+		const NormalizedY top_limit, const NormalizedY top_threshold,
+		const NormalizedY bottom_limit, const NormalizedY bottom_threshold,
 		const NormalizedY top_peak, const NormalizedY bottom_peak)
 		{
 			return make_some_charactors(
-				top_limit, top_threshold_diff,
-				bottom_limit, bottom_threshold_diff,
+				top_limit, top_threshold,
+				bottom_limit, bottom_threshold,
 				top_peak, bottom_peak,
 				linear_interp);
 		};
 
 	constexpr static inline auto make_lagrange_character = [](
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
+		const NormalizedY top_limit, const NormalizedY top_threshold,
+		const NormalizedY bottom_limit, const NormalizedY bottom_threshold,
 		const NormalizedY top_peak, const NormalizedY bottom_peak)
 		{
 			return make_some_charactors(
-				top_limit, top_threshold_diff,
-				bottom_limit, bottom_threshold_diff,
+				top_limit, top_threshold,
+				bottom_limit, bottom_threshold,
 				top_peak, bottom_peak,
 				lagrange_interp);
 		};
 
 	constexpr static inline auto make_spline_character = [](
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
+		const NormalizedY top_limit, const NormalizedY top_threshold,
+		const NormalizedY bottom_limit, const NormalizedY bottom_threshold,
 		const NormalizedY top_peak, const NormalizedY bottom_peak)
 		{
 			return make_some_charactors(
-				top_limit, top_threshold_diff,
-				bottom_limit, bottom_threshold_diff,
+				top_limit, top_threshold,
+				bottom_limit, bottom_threshold,
 				top_peak, bottom_peak,
 				spline_interp);
 		};
@@ -83,12 +79,12 @@ namespace luminance_limiter_sg {
 
 	template<typename F>
 	const static inline std::function<float(float)> make_character(
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
+		const NormalizedY top_limit, const NormalizedY top_threshold,
+		const NormalizedY bottom_limit, const NormalizedY bottom_threshold,
 		const NormalizedY top_peak, const NormalizedY bottom_peak,
 		const F&& character)
 	{
-		return character(top_limit, top_threshold_diff, bottom_limit, bottom_threshold_diff, top_peak, bottom_peak);
+		return character(top_limit, top_threshold, bottom_limit, bottom_threshold, top_peak, bottom_peak);
 	}
 
 	template<typename F>
@@ -135,13 +131,9 @@ namespace luminance_limiter_sg {
 
 		std::function<NormalizedY(NormalizedY)> limiter = id;
 
-		BOOL update_scale(
-			const NormalizedY orig_top, const NormalizedY orig_bottom,
-			const NormalizedY top_diff, const NormalizedY bottom_diff);
-		BOOL update_gain(const NormalizedY gain);
 		BOOL update_limiter(
-			const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-			const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
+			const NormalizedY top_limit, const NormalizedY top_threshold,
+			const NormalizedY bottom_limit, const NormalizedY bottom_threshold,
 			const NormalizedY top_peak, const NormalizedY bottom_peak,
 			InterpolationMode mode);
 		NormalizedY limit(const NormalizedY y) const;

@@ -51,8 +51,6 @@ namespace luminance_limiter_sg
 
 		const auto release = std::ceil(static_cast<float>(fp->track[8]) * ProjectParameter::fps().value() / 1000.0f);
 		peak_envelope_generator.set_release(release);
-		const auto gain_val = normalize_y(fp->track[3]);
-		amplifier.update_gain(gain_val);
 	}
 
 	const std::function<float(float)> Limiter::effect() const noexcept
@@ -76,17 +74,18 @@ namespace luminance_limiter_sg
 		const auto bottom_diff = normalize_y(fp->track[2]);
 		amplifier.update_scale(orig_top, orig_bottom, top_diff, bottom_diff);
 
+		const auto gain_val = normalize_y(fp->track[3]);
+		amplifier.update_gain(gain_val);
+
 		const auto gained_top = amplifier.scale_and_gain(orig_top);
 		const auto gained_bottom = amplifier.scale_and_gain(orig_bottom);
 		const auto [enveloped_top, enveloped_bottom] =
 			peak_envelope_generator.update_and_get_envelope_peaks(gained_top, gained_bottom);
 
-		const auto top_threshold_diff = thresholds[1] - top_limit;
-		const auto bottom_threshold_diff = thresholds[2] - bottom_limit;
 		const auto limit_character_interpolation_mode = static_cast<InterpolationMode>(fp->track[9]);
 		update_limiter(
-			top_limit, top_threshold_diff,
-			bottom_limit, bottom_threshold_diff,
+			top_limit, thresholds[1],
+			bottom_limit, thresholds[0],
 			enveloped_top, enveloped_bottom,
 			limit_character_interpolation_mode);
 	}
@@ -95,12 +94,6 @@ namespace luminance_limiter_sg
 	{
 		switch (track)
 		{
-		case 4U:
-		{
-			const auto gain_val = normalize_y(fp->track[3]);
-			amplifier.update_gain(gain_val);
-			break;
-		}
 		case 8U:
 		{
 			const auto sustain = static_cast<uint32_t>(std::floor(static_cast<float>(fp->track[7]) * ProjectParameter::fps().value() / 1000.0f));
@@ -148,15 +141,15 @@ namespace luminance_limiter_sg
 	}
 
 	BOOL Limiter::update_limiter(
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
+		const NormalizedY top_limit, const NormalizedY top_threshold,
+		const NormalizedY bottom_limit, const NormalizedY bottom_threshold,
 		const NormalizedY top_peak, const NormalizedY bottom_peak,
 		InterpolationMode mode)
 	{
 		this->limiter = make_limit(
 			make_character(
-				top_limit, top_threshold_diff,
-				bottom_limit, bottom_threshold_diff,
+				top_limit, top_threshold,
+				bottom_limit, bottom_threshold,
 				top_peak, bottom_peak,
 				select_character(mode)),
 			top_limit, bottom_limit);
