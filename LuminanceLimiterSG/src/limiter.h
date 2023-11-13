@@ -1,4 +1,3 @@
-#pragma once
 /*
 	Copyright(c) 2023 SoseiGocho
 	This Source Code Form is subject to the terms of the Mozilla Public License,
@@ -11,45 +10,26 @@
 
 #include "luminance_limiter_sg.h"
 
+#include <algorithm>
 #include <functional>
-#include <optional>
-#include <stdexcept>
+
+#include "buffer.h"
+#include "interpolation.h"
+#include "luminance.h"
+#include "peak_envelope_generator.h"
 
 
 namespace luminance_limiter_sg {
-	constexpr static inline auto stretch_scale(const NormalizedY peak, const NormalizedY threashold, const NormalizedY diff) noexcept;
-	constexpr static inline auto stretch_diff(const NormalizedY threashold, const NormalizedY scale, const NormalizedY y) noexcept;
-	const inline std::function<NormalizedY(NormalizedY)> make_scale(
-		const NormalizedY orig_top, const NormalizedY orig_bottom,
-		const NormalizedY top_diff, const NormalizedY bottom_diff) noexcept;
-	const inline std::function<NormalizedY(NormalizedY)> make_gain(const NormalizedY gain) noexcept;
-
-	enum class InterpolationMode : int32_t
-	{
-		Linear,
-		Lagrange,
-		Spline
-	};
-
-	const inline std::function<float(float)> linear_interp(const std::vector<float>&& xs, const std::vector<float>&& ys);
-	const inline std::function<float(float)> lagrange_interp(const std::vector<float>&& xs, const std::vector<float>&& ys);
-	constexpr static inline auto tdma(const std::vector<float>& a, const std::vector<float>& b, const std::vector<float>& c, const std::vector<float>& d);
-	constexpr static inline std::optional<int> inner_binary_search(const std::vector<float>& xs, const float x, const int max_idx, const int min_idx);
-	constexpr static inline auto binary_search(const std::vector<float>& xs, const float x);
-	const inline std::function<float(float)> spline_interp(const std::vector<float>&& xs, const std::vector<float>&& ys);
-
 	template<typename F>
 	constexpr static inline auto make_some_charactors(
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
-		const NormalizedY top_peak, const NormalizedY bottom_peak,
+		const double top_limit, const double top_threshold,
+		const double bottom_limit, const double bottom_threshold,
+		const double top_peak, const double bottom_peak,
 		const F&& interp_method)
 	{
-		const auto top_threshold = top_limit + top_threshold_diff;
-		const auto bottom_threshold = bottom_limit + bottom_threshold_diff;
 		const auto x0 = bottom_peak <= bottom_limit ? bottom_peak : bottom_limit;
 		const auto x3 = top_peak >= top_limit ? top_peak : top_limit;
-		auto xs = std::vector{ x0, bottom_threshold, top_threshold, x3 };
+		auto xs = std::vector{ x0, bottom_threshold, top_threshold, x3};
 		std::sort(xs.begin(), xs.end());
 		auto ys = std::vector{ bottom_limit, bottom_threshold, top_threshold, top_limit };
 		std::sort(ys.begin(), ys.end());
@@ -57,64 +37,64 @@ namespace luminance_limiter_sg {
 	}
 
 	constexpr static inline auto make_linear_character = [](
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
-		const NormalizedY top_peak, const NormalizedY bottom_peak)
+		const double top_limit, const double top_threshold,
+		const double bottom_limit, const double bottom_threshold,
+		const double top_peak, const double bottom_peak)
 		{
 			return make_some_charactors(
-				top_limit, top_threshold_diff,
-				bottom_limit, bottom_threshold_diff,
+				top_limit, top_threshold,
+				bottom_limit, bottom_threshold,
 				top_peak, bottom_peak,
 				linear_interp);
 		};
 
 	constexpr static inline auto make_lagrange_character = [](
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
-		const NormalizedY top_peak, const NormalizedY bottom_peak)
+		const double top_limit, const double top_threshold,
+		const double bottom_limit, const double bottom_threshold,
+		const double top_peak, const double bottom_peak)
 		{
 			return make_some_charactors(
-				top_limit, top_threshold_diff,
-				bottom_limit, bottom_threshold_diff,
+				top_limit, top_threshold,
+				bottom_limit, bottom_threshold,
 				top_peak, bottom_peak,
 				lagrange_interp);
 		};
 
 	constexpr static inline auto make_spline_character = [](
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
-		const NormalizedY top_peak, const NormalizedY bottom_peak)
+		const double top_limit, const double top_threshold,
+		const double bottom_limit, const double bottom_threshold,
+		const double top_peak, const double bottom_peak)
 		{
 			return make_some_charactors(
-				top_limit, top_threshold_diff,
-				bottom_limit, bottom_threshold_diff,
+				top_limit, top_threshold,
+				bottom_limit, bottom_threshold,
 				top_peak, bottom_peak,
 				spline_interp);
 		};
 
 	const static inline std::function<
-		std::function<float(float)>(
-			NormalizedY, NormalizedY,
-			NormalizedY, NormalizedY,
-			NormalizedY, NormalizedY)> select_character(InterpolationMode mode);
+		std::function<double(double)>(
+			double, double,
+			double, double,
+			double, double)> select_character(InterpolationMode mode);
 
 	template<typename F>
-	const static inline std::function<float(float)> make_character(
-		const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
-		const NormalizedY top_peak, const NormalizedY bottom_peak,
+	const static inline std::function<double(double)> make_character(
+		const double top_limit, const double top_threshold,
+		const double bottom_limit, const double bottom_threshold,
+		const double top_peak, const double bottom_peak,
 		const F&& character)
 	{
-		return character(top_limit, top_threshold_diff, bottom_limit, bottom_threshold_diff, top_peak, bottom_peak);
+		return character(top_limit, top_threshold, bottom_limit, bottom_threshold, top_peak, bottom_peak);
 	}
 
-	template <typename F>
+	template<typename F>
 	constexpr static inline auto make_limit(
 		const F&& character,
-		const NormalizedY top_limit,
-		const NormalizedY bottom_limit)
+		const double top_limit,
+		const double bottom_limit)
 	{
-		return [=, character = std::move(character)](const NormalizedY y) -> NormalizedY {
+		return [=, character = std::move(character)](const double y) -> double {
 			const auto charactered = character(y);
 			if (charactered > top_limit)
 			{
@@ -128,28 +108,35 @@ namespace luminance_limiter_sg {
 			{
 				return charactered;
 			}
-			};
+		};
 	}
 
-	constexpr inline auto id = [](auto x) -> auto { return x; };
-
-	class Limiter {
+	class Limiter
+	{
 	public:
-		Limiter();
-		BOOL update_scale(
-			const NormalizedY orig_top, const NormalizedY orig_bottom,
-			const NormalizedY top_diff, const NormalizedY bottom_diff);
-		BOOL update_gain(const NormalizedY gain);
-		BOOL update_limiter(
-			const NormalizedY top_limit, const NormalizedY top_threshold_diff,
-			const NormalizedY bottom_limit, const NormalizedY bottom_threshold_diff,
-			const NormalizedY top_peak, const NormalizedY bottom_peak,
-			InterpolationMode mode);
-		NormalizedY scale_and_gain(const NormalizedY y) const;
-		NormalizedY limit(const NormalizedY y) const;
+		Limiter(const AviUtl::FilterPlugin* const fp);
+
+		const std::function<double(double)> effect() const noexcept;
+		const void fetch_trackbar_and_buffer(const AviUtl::FilterPlugin* const fp, const Buffer& buffer);
+		const void update_from_trackbar(const AviUtl::FilterPlugin* const fp, const uint32_t track) noexcept;
+
+		const void used() noexcept ;
+		const void reset() noexcept ;
+
+		const bool is_using() const noexcept ;
 	private:
-		std::function<float(float)> scale = id;
-		std::function<float(float)> gain = id;
-		std::function<NormalizedY(NormalizedY)> limiter = id;
+		bool use = false;
+
+		PeakEnvelopeGenerator peak_envelope_generator;
+
+		std::function<double(double)> limiter = id;
+
+		BOOL update_limiter(
+			const double top_limit, const double top_threshold,
+			const double bottom_limit, const double bottom_threshold,
+			const double top_peak, const double bottom_peak,
+			InterpolationMode mode);
+		double limit(const double y) const;
+
 	};
 }
