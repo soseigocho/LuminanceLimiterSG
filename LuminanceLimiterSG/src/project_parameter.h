@@ -15,11 +15,10 @@ namespace luminance_limiter_sg
 {
 	struct ProjectParameter
 	{
-		static std::optional<float>& fps() noexcept
+		static std::optional<double>& fps() noexcept
 		{
-			static std::optional<float> fps_data;
+			static std::optional<double> fps_data;
 			return fps_data;
 		}
 	};
-
 }

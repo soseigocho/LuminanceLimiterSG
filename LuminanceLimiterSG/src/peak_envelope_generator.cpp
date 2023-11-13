@@ -14,7 +14,7 @@
 
 
 namespace luminance_limiter_sg {
-	BOOL PeakEnvelopeGenerator::set_limit(const NormalizedY top, const NormalizedY bottom) noexcept
+	BOOL PeakEnvelopeGenerator::set_limit(const double top, const double bottom) noexcept
 	{
 		top_limit = top;
 		bottom_limit = bottom;
@@ -39,11 +39,11 @@ namespace luminance_limiter_sg {
 			|| !bottom_peak_lifetime_buffer.has_value() || !active_bottom_peak_buffer.has_value())
 		{
 			this->top_peak_lifetime_buffer =
-				std::make_optional<std::deque<NormalizedY>>(current_buffer_size, -std::numeric_limits<NormalizedY>::infinity());
-			this->active_top_peak_buffer = std::make_optional<std::deque<NormalizedY>>();
+				std::make_optional<std::deque<double>>(current_buffer_size, -std::numeric_limits<double>::infinity());
+			this->active_top_peak_buffer = std::make_optional<std::deque<double>>();
 			this->bottom_peak_lifetime_buffer =
-				std::make_optional<std::deque<NormalizedY>>(current_buffer_size, std::numeric_limits<NormalizedY>::infinity());
-			this->active_bottom_peak_buffer = std::make_optional<std::deque<NormalizedY>>();
+				std::make_optional<std::deque<double>>(current_buffer_size, std::numeric_limits<double>::infinity());
+			this->active_bottom_peak_buffer = std::make_optional<std::deque<double>>();
 
 			return true;
 		}
@@ -75,7 +75,7 @@ namespace luminance_limiter_sg {
 			const auto top_shrink_size = current_buffer_size - top_peak_lifetime_buffer.value().size();
 			for (auto i = 0; i < top_shrink_size; i++)
 			{
-				top_peak_lifetime_buffer.value().push_front(0.0f);
+				top_peak_lifetime_buffer.value().push_front(0.0);
 			}
 		}
 
@@ -84,20 +84,20 @@ namespace luminance_limiter_sg {
 			const auto bottom_shrink_size = current_buffer_size - bottom_peak_lifetime_buffer.value().size();
 			for (auto i = 0; i < bottom_shrink_size; i++)
 			{
-				bottom_peak_lifetime_buffer.value().push_front(0.0f);
+				bottom_peak_lifetime_buffer.value().push_front(0.0);
 			}
 		}
 
 		return true;
 	};
 
-	BOOL PeakEnvelopeGenerator::set_release(const float release)
+	BOOL PeakEnvelopeGenerator::set_release(const double release)
 	{
 		this->release = release;
 		return true;
 	};
 
-	std::array<NormalizedY, 2> PeakEnvelopeGenerator::hold_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept {
+	std::array<double, 2> PeakEnvelopeGenerator::hold_peaks(const double top_peak, const double bottom_peak) noexcept {
 		if (!top_peak_lifetime_buffer.has_value() || !active_top_peak_buffer.has_value()
 			|| !bottom_peak_lifetime_buffer.has_value() || !active_bottom_peak_buffer.has_value())
 		{
@@ -141,12 +141,12 @@ namespace luminance_limiter_sg {
 		return { current_top_peak, current_bottom_peak };
 	}
 
-	std::array<NormalizedY, 2> PeakEnvelopeGenerator::wrap_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept {
-		NormalizedY wraped_top;
+	std::array<double, 2> PeakEnvelopeGenerator::wrap_peaks(const double top_peak, const double bottom_peak) noexcept {
+		double wraped_top;
 		if (ongoing_top_peak == top_peak)
 		{
 			wraped_top = top_peak;
-			top_peak_duration = 0.0f;
+			top_peak_duration = 0.0;
 		}
 		else
 		{
@@ -158,7 +158,7 @@ namespace luminance_limiter_sg {
 			{
 				wraped_top = top_peak;
 				ongoing_top_peak = top_peak;
-				top_peak_duration = 0.0f;
+				top_peak_duration = 0.0;
 			}
 			else
 			{
@@ -166,11 +166,11 @@ namespace luminance_limiter_sg {
 			}
 		}
 
-		NormalizedY wraped_bottom;
+		double wraped_bottom;
 		if (ongoing_bottom_peak == bottom_peak)
 		{
 			wraped_bottom = bottom_peak;
-			bottom_peak_duration = 0.0f;
+			bottom_peak_duration = 0.0;
 		}
 		else
 		{
@@ -182,7 +182,7 @@ namespace luminance_limiter_sg {
 			{
 				wraped_bottom = bottom_peak;
 				ongoing_bottom_peak = bottom_peak;
-				bottom_peak_duration = 0.0f;
+				bottom_peak_duration = 0.0;
 			}
 			else
 			{
@@ -192,7 +192,7 @@ namespace luminance_limiter_sg {
 		return { wraped_top, wraped_bottom };
 	};
 
-	std::array<NormalizedY, 2> PeakEnvelopeGenerator::update_and_get_envelope_peaks(const NormalizedY top_peak, const NormalizedY bottom_peak) noexcept {
+	std::array<double, 2> PeakEnvelopeGenerator::update_and_get_envelope_peaks(const double top_peak, const double bottom_peak) noexcept {
 		const auto [current_top_peak, current_bottom_peak] = hold_peaks(top_peak, bottom_peak);
 		const auto [wrapped_top_peak, wrapped_bottom_peak] = wrap_peaks(current_top_peak, current_bottom_peak);
 		return { wrapped_top_peak, wrapped_bottom_peak };

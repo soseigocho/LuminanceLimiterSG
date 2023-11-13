@@ -14,16 +14,16 @@
 namespace luminance_limiter_sg
 {
 	Buffer::Buffer(uint32_t width, uint32_t height) noexcept
-		: width(width), height(height), buffer(width * height, 0.0f)
+		: width(width), height(height), buffer(width * height, 0.0)
 	{
 	}
 
-	const NormalizedY Buffer::maximum() const noexcept
+	const double Buffer::maximum() const noexcept
 	{
 		return *std::max_element(this->buffer.begin(), this->buffer.end());
 	}
 
-	const NormalizedY Buffer::minimum() const noexcept
+	const double Buffer::minimum() const noexcept
 	{
 		return *std::min_element(this->buffer.begin(), this->buffer.end());
 	}
@@ -37,7 +37,7 @@ namespace luminance_limiter_sg
 			row = dst + y * this->width;
 			for (auto x = 0; x < width; ++x)
 			{
-				buffer[buf_idx] = normalize_y((row + x)->y);
+				buffer[buf_idx] = Luminance::normalize_y((row + x)->y);
 				buf_idx++;
 			}
 		}
@@ -52,7 +52,9 @@ namespace luminance_limiter_sg
 			row = dst + y * this->width;
 			for (auto x = 0; x < width; ++x)
 			{
-				(row + x)->y = denormalize_y<int16_t>(buffer[buf_idx]);
+				const auto denormalized = Luminance::denormalize_y(buffer[buf_idx]);
+				using U = decltype(denormalized);
+				(row + x)->y = denormalized > static_cast<U>(INT16_MAX) ? static_cast<U>(INT16_MAX) : static_cast<int16_t>(denormalized);
 				buf_idx++;
 			}
 		}

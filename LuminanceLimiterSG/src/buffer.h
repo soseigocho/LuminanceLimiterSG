@@ -12,16 +12,16 @@
 #include <vector>
 
 #include "aviutl/filter.hpp"
+#include "common_utility.h"
 
 namespace luminance_limiter_sg
 {
-	using NormalizedY = float;
 	class Buffer {
 	public:
 		Buffer(uint32_t width, uint32_t height) noexcept;
 
-		const NormalizedY maximum() const noexcept;
-		const NormalizedY minimum() const noexcept;
+		const double maximum() const noexcept;
+		const double minimum() const noexcept;
 
 		template<typename F>
 		inline const void pixelwise_map(const F&& f) {
@@ -36,6 +36,6 @@ namespace luminance_limiter_sg
 	private:
 		uint32_t width = 0;
 		uint32_t height = 0;
-		std::vector<NormalizedY> buffer;
+		std::vector<double> buffer;
 	};
 }
