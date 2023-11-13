@@ -22,34 +22,28 @@ namespace luminance_limiter_sg
 		Spline
 	};
 
-	constexpr static inline std::optional<int> inner_binary_search(const std::vector<float>& xs, const float x, const int max_idx, const int min_idx) noexcept
+	constexpr static inline auto binary_search(const std::vector<double>& xs, const double x) noexcept
 	{
-		if (max_idx < min_idx)
+		auto left = -1;
+		auto right = xs.size() - 1;
+
+		while (right - left > 1)
 		{
-			return std::nullopt;
+			const auto mid = left + (right - left) / 2;
+			if (xs[mid] > x)
+			{
+				right = mid;
+			}
+			else
+			{
+				left = mid;
+			}
 		}
 
-		auto mid_idx = min_idx + (max_idx - min_idx) / 2;
-		if (xs[mid_idx] > x)
-		{
-			return inner_binary_search(xs, x, min_idx, mid_idx - 1);
-		}
-		else if (xs[mid_idx] < x)
-		{
-			return inner_binary_search(xs, x, mid_idx + 1, max_idx);
-		}
-		else
-		{
-			return mid_idx;
-		}
+		return right;
 	}
 
-	constexpr static inline auto binary_search(const std::vector<float>& xs, const float x) noexcept
-	{
-		return inner_binary_search(xs, x, 0, xs.size() - 1);
-	}
-
-	const static inline std::regular_invocable<float> auto linear_interp(const std::vector<float>&& xs, const std::vector<float>&& ys)
+	const static inline std::regular_invocable<double> auto linear_interp(const std::vector<double>&& xs, const std::vector<double>&& ys)
 	{
 		if (xs.size() != ys.size())
 		{
@@ -62,19 +56,20 @@ namespace luminance_limiter_sg
 		}
 
 		auto n = xs.size();
-		std::vector<float> slopes(n - 1);
+		std::vector<double> slopes(n - 1);
 		for (auto i = 0; i < n - 1; ++i)
 		{
 			slopes[i] = (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]);
 		}
 
-		return [=](float x) -> float {
-			const auto idx = binary_search(xs, x).value_or((x > xs[0]) ? 0 : (xs.size() - 1));
+		return [=](double x) -> double {
+			auto idx = binary_search(xs, x);
+			idx = idx >= xs.size() - 1 ? xs.size() - 2 : idx;
 			return ys[idx] + slopes[idx] * (x - xs[idx]);
 			};
 	};
 
-	const static inline std::regular_invocable<float> auto lagrange_interp(const std::vector<float>&& xs, const std::vector<float>&& ys)
+	const static inline std::regular_invocable<double> auto lagrange_interp(const std::vector<double>&& xs, const std::vector<double>&& ys)
 	{
 		if (xs.size() != ys.size())
 		{
@@ -86,11 +81,11 @@ namespace luminance_limiter_sg
 			throw std::runtime_error("Error: xs and ys must have at least 2 elements.");
 		}
 
-		return [=](float x) {
-			auto sum = 0.0f;
+		return [=](double x) {
+			auto sum = 0.0;
 			for (auto i = 0; i < xs.size(); ++i)
 			{
-				auto prod = 1.0f;
+				auto prod = 1.0;
 				for (auto j = 0; j < xs.size(); ++j)
 				{
 					if (i != j)
@@ -104,11 +99,11 @@ namespace luminance_limiter_sg
 			};
 	}
 
-	constexpr static inline auto tdma(const std::vector<float>& a, const std::vector<float>& b, const std::vector<float>& c, const std::vector<float>& d)
+	constexpr static inline auto tdma(const std::vector<double>& a, const std::vector<double>& b, const std::vector<double>& c, const std::vector<double>& d)
 	{
 		auto n = a.size() - 1;
-		auto p = std::vector<float>(a.size());
-		auto q = std::vector<float>(a.size());
+		auto p = std::vector<double>(a.size());
+		auto q = std::vector<double>(a.size());
 
 		p[0] = -b[0] / a[0];
 		q[0] = d[0] / a[0];
@@ -119,7 +114,7 @@ namespace luminance_limiter_sg
 			q[i] = (d[i] - c[i] * q[i - 1]) / (a[i] + c[i] * p[i - 1]);
 		}
 
-		auto x = std::vector<float>(a.size());
+		auto x = std::vector<double>(a.size());
 		x[n] = q[n];
 		for (auto i = n - 1; i > -1; i--)
 		{
@@ -129,7 +124,7 @@ namespace luminance_limiter_sg
 		return x;
 	}
 
-	const static inline std::regular_invocable<float> auto spline_interp(const std::vector<float>&& xs, const std::vector<float>&& ys)
+	const static inline std::regular_invocable<double> auto spline_interp(const std::vector<double>&& xs, const std::vector<double>&& ys)
 	{
 		if (xs.size() != ys.size())
 		{
@@ -143,19 +138,19 @@ namespace luminance_limiter_sg
 
 		const auto n = xs.size() - 1;
 
-		auto as = std::vector<float>(xs.size());
+		auto as = std::vector<double>(xs.size());
 		for (auto i = 0; i < xs.size(); i++)
 		{
 			as[i] = ys[i];
 		}
 
-		auto hs = std::vector<float>(n);
+		auto hs = std::vector<double>(n);
 		for (auto i = 0; i < n; i++)
 		{
 			hs[i] = xs[i + 1] - xs[i];
 		}
 
-		auto aas = std::vector<float>(xs.size());
+		auto aas = std::vector<double>(xs.size());
 		for (auto i = 0; i < xs.size(); i++)
 		{
 			if (i == 0)
@@ -172,7 +167,7 @@ namespace luminance_limiter_sg
 			}
 		}
 
-		auto abs = std::vector<float>(xs.size());
+		auto abs = std::vector<double>(xs.size());
 		for (auto i = 0; i < xs.size(); i++)
 		{
 			if (i == 0)
@@ -189,7 +184,7 @@ namespace luminance_limiter_sg
 			}
 		}
 
-		auto acs = std::vector<float>(xs.size());
+		auto acs = std::vector<double>(xs.size());
 		for (auto i = 0; i < xs.size(); i++)
 		{
 			if (i == 0)
@@ -202,7 +197,7 @@ namespace luminance_limiter_sg
 			}
 		}
 
-		auto prod_b = std::vector<float>(xs.size());
+		auto prod_b = std::vector<double>(xs.size());
 		for (auto i = 0; i < xs.size(); i++)
 		{
 			if (i == 0 || i == n)
@@ -217,8 +212,8 @@ namespace luminance_limiter_sg
 
 		auto cs = tdma(aas, abs, acs, prod_b);
 
-		auto bs = std::vector<float>(xs.size());
-		auto ds = std::vector<float>(xs.size());
+		auto bs = std::vector<double>(xs.size());
+		auto ds = std::vector<double>(xs.size());
 		for (auto i = 0; i <= n; i++)
 		{
 			if (i == n)
@@ -233,13 +228,11 @@ namespace luminance_limiter_sg
 			}
 		}
 
-		return [=](float x) {
-			auto opt_i = binary_search(xs, x);
-
-			auto i = opt_i.value_or((x > xs[0]) ? 0 : (xs.size() - 1));
-
-			auto dt = x - xs[i];
-			return as[i] + (bs[i] + (cs[i] + ds[i] * dt) * dt) * dt;
+		return [=](double x) {
+			auto idx = binary_search(xs, x);
+			idx = idx >= xs.size() ? xs.size() - 1 : idx;
+			auto dt = x - xs[idx];
+			return as[idx] + (bs[idx] + (cs[idx] + ds[idx] * dt) * dt) * dt;
 			};
 	}
 

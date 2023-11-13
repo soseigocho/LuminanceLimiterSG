@@ -159,9 +159,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\amplifier.cpp" />
     <ClCompile Include="src\buffer.cpp" />
-    <ClCompile Include="src\compressor.cpp" />
     <ClCompile Include="src\limiter.cpp" />
     <ClCompile Include="src\luminance_limiter_sg.cpp" />
     <ClCompile Include="src\peak_envelope_generator.cpp" />
@@ -170,19 +168,14 @@
     <ClCompile Include="test\luminance_limiter_sg_test.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\amplifier.h" />
     <ClInclude Include="src\buffer.h" />
     <ClInclude Include="src\common_utility.h" />
-    <ClInclude Include="src\compressor.h" />
-    <ClInclude Include="src\effector.h" />
     <ClInclude Include="src\interpolation.h" />
     <ClInclude Include="src\limiter.h" />
     <ClInclude Include="src\luminance.h" />
     <ClInclude Include="src\luminance_limiter_sg.h" />
-    <ClInclude Include="src\processing_mode.h" />
     <ClInclude Include="src\project_parameter.h" />
     <ClInclude Include="src\rack.h" />
-    <ClInclude Include="src\rack_unit.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\luminance_limiter_sg.def" />

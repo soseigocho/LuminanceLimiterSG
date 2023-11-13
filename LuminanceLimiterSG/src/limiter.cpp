@@ -12,16 +12,15 @@
 #include <stdexcept>
 
 #include "common_utility.h"
-#include "luminance.h"
 #include "project_parameter.h"
 
 namespace luminance_limiter_sg
 {
 	const inline std::function<
-		std::function<float(float)>(
-			NormalizedY, NormalizedY,
-			NormalizedY, NormalizedY,
-			NormalizedY, NormalizedY)> select_character(InterpolationMode mode)
+		std::function<double(double)>(
+			double, double,
+			double, double,
+			double, double)> select_character(InterpolationMode mode)
 	{
 		switch (mode)
 		{
@@ -38,24 +37,24 @@ namespace luminance_limiter_sg
 
 	Limiter::Limiter(const AviUtl::FilterPlugin* const fp)
 	{
-		const auto top_limit = normalize_y(fp->track[11]);
-		const auto bottom_limit = normalize_y(fp->track[12]);
+		const auto top_limit = Luminance::normalize_y(fp->track[1]);
+		const auto bottom_limit = Luminance::normalize_y(fp->track[4]);
 		peak_envelope_generator.set_limit(top_limit, bottom_limit);
 
 		if (!ProjectParameter::fps())
 		{
 			throw std::runtime_error("Fps has not initialized.");
 		}
-		const auto sustain = static_cast<uint32_t>(std::floor(static_cast<float>(fp->track[7]) * ProjectParameter::fps().value() / 1000.0f));
+		const auto sustain = static_cast<uint32_t>(std::floor(static_cast<double>(fp->track[5]) * ProjectParameter::fps().value() / 1000.0));
 		peak_envelope_generator.set_sustain(sustain);
 
-		const auto release = std::ceil(static_cast<float>(fp->track[8]) * ProjectParameter::fps().value() / 1000.0f);
+		const auto release = std::ceil(static_cast<double>(fp->track[6]) * ProjectParameter::fps().value() / 1000.0);
 		peak_envelope_generator.set_release(release);
 	}
 
-	const std::function<float(float)> Limiter::effect() const noexcept
+	const std::function<double(double)> Limiter::effect() const noexcept
 	{
-		return [&](float y) -> float { return limit(amplifier.scale_and_gain(y)); };
+		return [&](double y) -> double { return limit(y); };
 	}
 
 	const void Limiter::fetch_trackbar_and_buffer(const AviUtl::FilterPlugin* const fp, const Buffer& buffer)
@@ -63,26 +62,16 @@ namespace luminance_limiter_sg
 		const auto orig_top = buffer.maximum();
 		const auto orig_bottom = buffer.minimum();
 
-		const auto top_limit = normalize_y(fp->track[11]);
-		const auto bottom_limit = normalize_y(fp->track[12]);
+		const auto top_limit = Luminance::normalize_y(fp->track[1]);
+		const auto bottom_limit =Luminance::normalize_y(fp->track[4]);
 		
-		auto thresholds = std::array<uint32_t, 2>({
-			static_cast<uint32_t>(fp->track[4]), static_cast<uint32_t>(fp->track[5])});
+		auto thresholds = std::array<double, 2>({ Luminance::normalize_y(fp->track[2]), Luminance::normalize_y(fp->track[3]) });
 		std::sort(thresholds.begin(), thresholds.end());
 
-		const auto top_diff = normalize_y(fp->track[1]);
-		const auto bottom_diff = normalize_y(fp->track[2]);
-		amplifier.update_scale(orig_top, orig_bottom, top_diff, bottom_diff);
-
-		const auto gain_val = normalize_y(fp->track[3]);
-		amplifier.update_gain(gain_val);
-
-		const auto gained_top = amplifier.scale_and_gain(orig_top);
-		const auto gained_bottom = amplifier.scale_and_gain(orig_bottom);
 		const auto [enveloped_top, enveloped_bottom] =
-			peak_envelope_generator.update_and_get_envelope_peaks(gained_top, gained_bottom);
+			peak_envelope_generator.update_and_get_envelope_peaks(orig_top, orig_bottom);
 
-		const auto limit_character_interpolation_mode = static_cast<InterpolationMode>(fp->track[9]);
+		const auto limit_character_interpolation_mode = static_cast<InterpolationMode>(fp->track[7]);
 		update_limiter(
 			top_limit, thresholds[1],
 			bottom_limit, thresholds[0],
@@ -96,27 +85,27 @@ namespace luminance_limiter_sg
 		{
 		case 8U:
 		{
-			const auto sustain = static_cast<uint32_t>(std::floor(static_cast<float>(fp->track[7]) * ProjectParameter::fps().value() / 1000.0f));
+			const auto sustain = static_cast<uint32_t>(std::floor(static_cast<double>(fp->track[5]) * ProjectParameter::fps().value() / 1000.0));
 			peak_envelope_generator.set_sustain(sustain);
 			break;
 		}
 		case 9U:
 		{
-			const auto release = std::ceil(static_cast<float>(fp->track[8]) * ProjectParameter::fps().value() / 1000.0f);
+			const auto release = std::ceil(static_cast<double>(fp->track[6]) * ProjectParameter::fps().value() / 1000.0);
 			peak_envelope_generator.set_release(release);
 			break;
 		}
-		case 12U:
+		case 13U:
 		{			
-			const auto top_limit = normalize_y(fp->track[11]);
-			const auto bottom_limit = normalize_y(fp->track[12]);
+			const auto top_limit = Luminance::normalize_y(fp->track[1]);
+			const auto bottom_limit = Luminance::normalize_y(fp->track[4]);
 			peak_envelope_generator.set_limit(top_limit, bottom_limit);
 			break;
 		}
-		case 13U:
+		case 14U:
 		{
-			const auto top_limit = normalize_y(fp->track[11]);
-			const auto bottom_limit = normalize_y(fp->track[12]);
+			const auto top_limit = Luminance::normalize_y(fp->track[1]);
+			const auto bottom_limit = Luminance::normalize_y(fp->track[4]);
 			peak_envelope_generator.set_limit(top_limit, bottom_limit);
 			break;
 		}
@@ -141,9 +130,9 @@ namespace luminance_limiter_sg
 	}
 
 	BOOL Limiter::update_limiter(
-		const NormalizedY top_limit, const NormalizedY top_threshold,
-		const NormalizedY bottom_limit, const NormalizedY bottom_threshold,
-		const NormalizedY top_peak, const NormalizedY bottom_peak,
+		const double top_limit, const double top_threshold,
+		const double bottom_limit, const double bottom_threshold,
+		const double top_peak, const double bottom_peak,
 		InterpolationMode mode)
 	{
 		this->limiter = make_limit(
@@ -157,7 +146,7 @@ namespace luminance_limiter_sg
 		return true;
 	}
 
-	NormalizedY Limiter::limit(const NormalizedY y) const
+	double Limiter::limit(const double y) const
 	{
 		return this->limiter(y);
 	}

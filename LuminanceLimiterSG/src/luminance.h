@@ -11,21 +11,11 @@
 
 namespace luminance_limiter_sg
 {
-	class Luminance
+	struct Luminance
 	{
-	public:
-		constexpr static inline auto y_max = 4096.0f;
-		constexpr static inline auto y_min = 0.0f;
-	private:
+		constexpr static inline auto y_max = 4096.0;
+		constexpr static inline auto y_min = 0.0;
+		constexpr static inline auto normalize_y(const auto y) -> auto { return static_cast<decltype(y_max)>(y) / y_max; }
+		constexpr static inline auto denormalize_y(const auto y) -> auto { return y * y_max; };
 	};
-
-	template <typename T>
-	float normalize_y(const T y) noexcept {
-		return static_cast<float>(y) / Luminance::y_max;
-	}
-
-	template <typename T>
-	T denormalize_y(const float y) noexcept {
-		return static_cast<T>(y * Luminance::y_max);
-	}
 }

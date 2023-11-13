@@ -22,13 +22,13 @@ namespace luminance_limiter_sg
 		{
 			if (elem)
 			{
-				if (!(std::visit([](const auto& x) { return x.is_using(); }, *elem.value())))
+				if (!elem->is_using())
 				{
 					elem.reset();
 				}
 				else
 				{
-					std::visit([](auto& x) { x.reset(); }, *elem.value());
+					elem->reset();
 				}
 			}
 		}
@@ -44,20 +44,9 @@ namespace luminance_limiter_sg
 		return result;
 	}
 
-	const void Rack::set_effector(uint32_t idx, ProcessingMode processing_mode, const AviUtl::FilterPlugin* const fp)
+	const void Rack::set_effector(uint32_t idx, const AviUtl::FilterPlugin* const fp)
 	{
-		using R = RackUnit<Compressor, Limiter>;
-		switch (processing_mode)
-		{
-		case ProcessingMode::Compressor:
-			elements[idx].emplace(std::make_unique<R>(Compressor(fp)));
-			break;
-		case luminance_limiter_sg::ProcessingMode::Limiter:
-			elements[idx].emplace(std::make_unique<R>(Limiter(fp)));
-			break;
-		default:
-			break;
-		}
+		elements[idx].emplace(Limiter(fp));
 	}
 
 	uint32_t Rack::size() const noexcept
@@ -65,7 +54,7 @@ namespace luminance_limiter_sg
 		return elements.size();
 	}
 
-	std::optional<std::unique_ptr<RackUnit<Compressor, Limiter>>>& Rack::operator[] (size_t idx) noexcept
+	std::optional<Limiter>& Rack::operator[] (size_t idx) noexcept
 	{
 		return elements[idx];
 	}
