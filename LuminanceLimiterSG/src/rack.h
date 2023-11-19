@@ -8,13 +8,10 @@
 
 #pragma once
 
-#include "rack_unit.h"
-
 #include <array>
 #include <memory>
 
 #include "processing_mode.h"
-#include "compressor.h"
 #include "limiter.h"
 
 namespace luminance_limiter_sg
@@ -26,10 +23,8 @@ namespace luminance_limiter_sg
 	public:
 		Rack();
 
-		const void gc() noexcept;
-
-		const bool is_first_time(uint32_t current_frame) noexcept;
-		const void set_effector(uint32_t idx, const AviUtl::FilterPlugin* const fp);
+		const void check_and_set_effector(uint32_t idx, const AviUtl::FilterPlugin* const fp) noexcept;
+		const void gc(uint32_t current_frame) noexcept;
 
 		uint32_t size() const noexcept;
 
@@ -37,5 +32,8 @@ namespace luminance_limiter_sg
 	private:
 		uint32_t ongoing_frame = 0;
 		std::array<std::optional<Limiter>, num_or_racks> elements;
+
+		const bool is_first_time(uint32_t current_frame) noexcept;
+		const void set_effector(uint32_t idx, const AviUtl::FilterPlugin* const fp);
 	};
 }

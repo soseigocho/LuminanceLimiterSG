@@ -10,15 +10,27 @@
 
 #include <optional>
 
+#include "aviutl/filter.hpp"
+
 
 namespace luminance_limiter_sg
 {
-	struct ProjectParameter
+	class ProjectParameter
 	{
-		static std::optional<double>& fps() noexcept
+	public:
+		constexpr static inline void init(auto project_fps) noexcept
 		{
-			static std::optional<double> fps_data;
-			return fps_data;
+			if (fps)
+			{
+				fps = project_fps;
+			}
 		}
+
+		constexpr static inline const auto& get_fps() noexcept
+		{
+			return fps;
+		}
+	private:
+		static inline std::optional<double> fps = std::nullopt;
 	};
 }

@@ -11,6 +11,7 @@
 #include <array>
 #include <optional>
 
+#include "dithering_filter.h"
 #include "luminance.h"
 #include "project_parameter.h"
 #include "rack.h"
@@ -18,79 +19,64 @@
 
 namespace luminance_limiter_sg {
 	constexpr static inline auto name = "LuminanceLimiterSG";
-	
+
 	constexpr static inline auto track_n = 8u;
 	constexpr static inline auto track_name = std::array<const char*, track_n>
 	{
 		"ID",
-		"上限(L)", "閾値1", "閾値2", "下限(L)",
-		"S[ms]", "R[ms]",
-		"補間ﾓｰﾄﾞ"
+			"上限(L)", "閾値1", "閾値2", "下限(L)",
+			"S[ms]", "R[ms]",
+			"補間ﾓｰﾄﾞ"
 	};
 	constexpr static inline auto track_default = std::array<int32_t, track_n>
 	{
 		0,
-		4096,4095, 1, 0,
-		1, 0,
-		0
+			4096, 4095, 1, 0,
+			1, 0,
+			0
 	};
 	constexpr static inline auto track_s = std::array<int32_t, track_n>
 	{
 		0,
-		3, 2, 1, 0,
-		1, 0,
-		0
+			3, 2, 1, 0,
+			1, 0,
+			0
 	};
 	constexpr static inline auto track_e = std::array<int32_t, track_n>
 	{
 		num_or_racks,
-		4096, 4095, 4094, 4093,
-		4096, 4096,
-		2
+			4096, 4095, 4094, 4093,
+			4096, 4096,
+			2
 	};
 
 	constexpr static inline auto information = "LuminanceLimiterSG v0.2.0 by 粗製伍長";
 
-	static Rack rack = Rack();
+	static auto rack = Rack();
 	static std::optional<Buffer> processing_buffer = std::nullopt;
+	static auto dithering_filter = DitheringFilter();
 
 	static inline BOOL func_proc(AviUtl::FilterPlugin* fp, AviUtl::FilterProcInfo* fpip)
 	{
-		if (!ProjectParameter::fps())
-		{
-			AviUtl::FileInfo fi;
-			fp->exfunc->get_file_info(fpip->editp, &fi);
-			ProjectParameter::fps() = static_cast<double>(fi.video_rate);
-		}
+		ProjectParameter::init(static_cast<double>(get_fps(fp, fpip)));
 
-		if (!processing_buffer)
-		{
-			processing_buffer = Buffer(fpip->max_w, fpip->max_h);
-		}
+		rack.gc(static_cast<uint32_t>(fpip->frame));
 
-		if (rack.is_first_time(static_cast<uint32_t>(fpip->frame)))
-		{
-			rack.gc();
-		}
-
-		auto effector_id = static_cast<unsigned int>(fp->track[0]);
-
-		if (!rack[effector_id])
-		{
-			rack.set_effector(effector_id, fp);
-		}
-
+		auto effector_id = static_cast<uint32_t>(fp->track[0]);
+		
+		rack.check_and_set_effector(effector_id, fp);
 		rack[effector_id]->used();
 
-		processing_buffer.value().fetch_image(fpip->w, fpip->h, static_cast<AviUtl::PixelYC*>(fpip->ycp_edit));
+		processing_buffer = processing_buffer ? processing_buffer : Buffer(fpip->max_w, fpip->max_h);
+		processing_buffer->fetch_image(fpip->w, fpip->h, static_cast<AviUtl::PixelYC*>(fpip->ycp_edit));
 
-		rack[effector_id]->fetch_trackbar_and_buffer(fp, processing_buffer.value());
+		rack[effector_id]->fetch_trackbar_and_buffer(fp, *processing_buffer);
 
-		processing_buffer.value().pixelwise_map(rack[effector_id]->effect());
-		processing_buffer.value().render(fpip->w, fpip->h, static_cast<AviUtl::PixelYC*>(fpip->ycp_edit));
+		processing_buffer->pixelwise_map(rack[effector_id]->effect());
+		processing_buffer->render(fpip->w, fpip->h, static_cast<AviUtl::PixelYC*>(fpip->ycp_edit), dithering_filter.dither);
 
 		return true;
-	} 
+	}
 
 	static inline BOOL func_update(AviUtl::FilterPlugin* fp, AviUtl::FilterPluginDLL::UpdateStatus status)
 	{
@@ -102,6 +88,7 @@ namespace luminance_limiter_sg {
 				- static_cast<std::underlying_type<AviUtl::detail::FilterPluginUpdateStatus>::type>(AviUtl::detail::FilterPluginUpdateStatus::Track);
 
 			const auto effector_id = static_cast<uint32_t>(fp->track[0]);
+			rack.check_and_set_effector(effector_id, fp);
 			rack[effector_id]->update_from_trackbar(fp, track);
 		}
 		return true;

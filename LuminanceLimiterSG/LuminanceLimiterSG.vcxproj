@@ -170,6 +170,7 @@
   <ItemGroup>
     <ClInclude Include="src\buffer.h" />
     <ClInclude Include="src\common_utility.h" />
+    <ClInclude Include="src\dithering_filter.h" />
     <ClInclude Include="src\interpolation.h" />
     <ClInclude Include="src\limiter.h" />
     <ClInclude Include="src\luminance.h" />

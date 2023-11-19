@@ -41,14 +41,14 @@ namespace luminance_limiter_sg
 		const auto bottom_limit = Luminance::normalize_y(fp->track[4]);
 		peak_envelope_generator.set_limit(top_limit, bottom_limit);
 
-		if (!ProjectParameter::fps())
+		if (!ProjectParameter::get_fps())
 		{
 			throw std::runtime_error("Fps has not initialized.");
 		}
-		const auto sustain = static_cast<uint32_t>(std::floor(static_cast<double>(fp->track[5]) * ProjectParameter::fps().value() / 1000.0));
+		const auto sustain = static_cast<uint32_t>(std::floor(static_cast<double>(fp->track[5]) * ProjectParameter::get_fps().value() / 1000.0));
 		peak_envelope_generator.set_sustain(sustain);
 
-		const auto release = std::ceil(static_cast<double>(fp->track[6]) * ProjectParameter::fps().value() / 1000.0);
+		const auto release = std::ceil(static_cast<double>(fp->track[6]) * ProjectParameter::get_fps().value() / 1000.0);
 		peak_envelope_generator.set_release(release);
 	}
 
@@ -85,13 +85,13 @@ namespace luminance_limiter_sg
 		{
 		case 8U:
 		{
-			const auto sustain = static_cast<uint32_t>(std::floor(static_cast<double>(fp->track[5]) * ProjectParameter::fps().value() / 1000.0));
+			const auto sustain = static_cast<uint32_t>(std::floor(static_cast<double>(fp->track[5]) * ProjectParameter::get_fps().value() / 1000.0));
 			peak_envelope_generator.set_sustain(sustain);
 			break;
 		}
 		case 9U:
 		{
-			const auto release = std::ceil(static_cast<double>(fp->track[6]) * ProjectParameter::fps().value() / 1000.0);
+			const auto release = std::ceil(static_cast<double>(fp->track[6]) * ProjectParameter::get_fps().value() / 1000.0);
 			peak_envelope_generator.set_release(release);
 			break;
 		}

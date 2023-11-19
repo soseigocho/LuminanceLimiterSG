@@ -16,21 +16,16 @@ namespace luminance_limiter_sg
 		std::fill(elements.begin(), elements.end(), std::nullopt);
 	}
 
-	const void Rack::gc() noexcept
+	const void Rack::set_effector(uint32_t idx, const AviUtl::FilterPlugin* const fp)
 	{
-		for (auto&& elem: elements)
+		elements[idx].emplace(Limiter(fp));
+	}
+
+	const void Rack::check_and_set_effector(uint32_t idx, const AviUtl::FilterPlugin* const fp) noexcept
+	{
+		if (!elements[idx])
 		{
-			if (elem)
-			{
-				if (!elem->is_using())
-				{
-					elem.reset();
-				}
-				else
-				{
-					elem->reset();
-				}
-			}
+			set_effector(idx, fp);
 		}
 	}
 
@@ -44,9 +39,25 @@ namespace luminance_limiter_sg
 		return result;
 	}
 
-	const void Rack::set_effector(uint32_t idx, const AviUtl::FilterPlugin* const fp)
+	const void Rack::gc(uint32_t current_frame) noexcept
 	{
-		elements[idx].emplace(Limiter(fp));
+		if (is_first_time(static_cast<uint32_t>(current_frame)))
+		{
+			for (auto&& elem : elements)
+			{
+				if (elem)
+				{
+					if (!elem->is_using())
+					{
+						elem.reset();
+					}
+					else
+					{
+						elem->reset();
+					}
+				}
+			}
+		}
 	}
 
 	uint32_t Rack::size() const noexcept

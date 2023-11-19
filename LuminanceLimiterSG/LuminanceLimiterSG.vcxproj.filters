@@ -56,6 +56,9 @@
     <ClInclude Include="src\common_utility.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="src\dithering_filter.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\luminance_limiter_sg.def">

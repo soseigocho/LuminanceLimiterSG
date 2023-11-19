@@ -42,21 +42,4 @@ namespace luminance_limiter_sg
 			}
 		}
 	}
-
-	const void Buffer::render(uint32_t width, uint32_t height, AviUtl::PixelYC* dst) const
-	{
-		AviUtl::PixelYC* row = nullptr;
-		auto buf_idx = 0;
-		for (auto y = 0; y < height; ++y)
-		{
-			row = dst + y * this->width;
-			for (auto x = 0; x < width; ++x)
-			{
-				const auto denormalized = Luminance::denormalize_y(buffer[buf_idx]);
-				using U = decltype(denormalized);
-				(row + x)->y = denormalized > static_cast<U>(INT16_MAX) ? static_cast<U>(INT16_MAX) : static_cast<int16_t>(denormalized);
-				buf_idx++;
-			}
-		}
-	}
 }
